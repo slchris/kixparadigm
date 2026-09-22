@@ -69,7 +69,7 @@ kixparadigm/
 └── install.ps1 / install.sh / INSTALL.md / CHANGELOG.md
 ```
 
-> **唯一事实源约定**：`dsh/preset/` 是事实源，`~/.dsh/.agent-presets/kixparadigm/` 只是安装副本（维护 = 改 preset 后跑 `scripts/sync-dsh-preset.ps1 -Force`）；根目录 `skills/` 等是 Copilot 分发版，与 DSH 版刻意不同，不互相覆盖。
+> **唯一事实源约定**：`dsh/preset/` 是事实源，`~/.dsh/.agent-presets/kixparadigm/` 只是安装副本（维护 = 改 preset 后跑 `node scripts/sync-dsh-preset.cjs -Force`）；根目录 `skills/` 等是 Copilot 分发版，与 DSH 版刻意不同，不互相覆盖。
 
 ## 开发与验证
 

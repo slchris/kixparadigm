@@ -69,7 +69,7 @@ kixparadigm/
 └── install.ps1 / install.sh / INSTALL.md / CHANGELOG.md
 ```
 
-> **Source-of-truth convention**: `dsh/preset/` is the source of truth; `~/.dsh/.agent-presets/kixparadigm/` is only an installed copy (maintain = edit preset, then run `scripts/sync-dsh-preset.ps1 -Force`); root `skills/` etc. are the Copilot distribution, deliberately different from the DSH edition — do not overwrite either way.
+> **Source-of-truth convention**: `dsh/preset/` is the source of truth; `~/.dsh/.agent-presets/kixparadigm/` is only an installed copy (maintain = edit preset, then run `node scripts/sync-dsh-preset.cjs -Force`); root `skills/` etc. are the Copilot distribution, deliberately different from the DSH edition — do not overwrite either way.
 
 ## Development & verification
 
