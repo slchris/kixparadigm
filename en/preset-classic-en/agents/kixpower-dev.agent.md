@@ -5,24 +5,9 @@ user-invocable: false
 agents: []
 # 省略 tools 字段 = 所有工具可用；源码编辑范围由 plan.md 约束；非 Orchestrator Hook 禁写 L2/QA 权威字段
 disable-model-invocation: false
-hooks:
-  PreToolUse:
-    - type: command
-      command: 'pwsh -NoProfile -File "../skills/kixpower/hooks/block-dev-authority-edit.ps1"'
-      timeout: 10
-    - type: command
-      command: 'pwsh -NoProfile -File "../skills/kixpower/hooks/blast-radius-check.ps1"'
-      timeout: 10
-    - type: command
-      command: 'pwsh -NoProfile -File "../skills/kixpower/hooks/pre-commit-lint-check.ps1"'
-      timeout: 30
-  PostToolUse:
-    - type: command
-      command: 'pwsh -NoProfile -File "../skills/kixpower/hooks/auto-update-progress.ps1"'
-      timeout: 10
 ---
 
-> **DSH 适配注记**：本角色定义从 VS Code Copilot 导入，在 DeepSeek Harness 中作为 subagent 分派的 prompt 模板使用（DSH 的 subagent 无 agentName 参数，把本文件角色 body 注入 prompt 即可）。文档中的工具名/机制映射见 classic 档 DSH-ADAPTATION.md（runSubagent→subagent/subagent_cross、run_in_terminal→pwsh、vscode_askQuestions→ask_user_question、codegraphy_*→grep/read）。**frontmatter 的 hooks 块不自动触发**——blast-radius 等机械门禁已由 `plugins/kix-guards.js`（tools/pre-execute）原生强制，无需手动调用 ps1；block-dev-authority-edit（禁止 Dev 写 L2/QA 权威字段）由本角色 prompt 的「不越权」硬约束承载。角色职责、硬约束、可编辑范围原样生效。
+> **DSH 适配注记**：本角色定义从 VS Code Copilot 导入，在 DeepSeek Harness 中作为 subagent 分派的 prompt 模板使用（DSH 的 subagent 无 agentName 参数，把本文件角色 body 注入 prompt 即可）。文档中的工具名/机制映射见 classic 档 DSH-ADAPTATION.md（runSubagent→subagent/subagent_cross、run_in_terminal→终端工具（宿主能力条件：`pwsh` 或 `bash`，见 `kix-guards.js` 的 `TERMINAL_TOOLS`）、vscode_askQuestions→ask_user_question、codegraphy_*→grep/read）。**本角色定义不携带 Copilot hooks 块**（Sprint 2 P1 清理死引用）：blast-radius 等机械门禁由 `plugins/kix-guards.js`（tools/pre-execute）原生强制；block-dev-authority-edit（禁止 Dev 写 L2/QA 权威字段）由本角色 prompt 的「不越权」硬约束承载。角色职责、硬约束、可编辑范围原样生效。
 
 # Kixpower Dev — Nova / Sage / Milo（开发团队）
 
@@ -50,7 +35,7 @@ hooks:
 5. 每完成一个任务：
   - **立即自跑 local_gate**（cargo test --lib / clippy / fmt --check / tsc）— 这是提交前自测，不替代 Orchestrator 的权威 L2
   - 更新 `docs/sprint-*/progress.md`（含 frontmatter：completed_tasks++、artifacts_changed_since_last_observe、`dev_self_tests_passed` 字段）；**不得写** `l2_verification_passed` / `l2_verified_sha`
-   - git 提交（`feat:`/`fix:` 前缀，关联任务编号）— 受 `blast-radius-check.ps1` hook 拦截
+   - git 提交（`feat:`/`fix:` 前缀，关联任务编号）— 受 `kix-guards` 的 blast-radius 机械门禁拦截
 6. 遇到阻塞 → 记录到 progress.md 的 `❌ Blocked` 区块，**并追加一条 lessons-learned.md 记录**（失败模式+根因+下次避免），交回 Producer
 7. 任务完成时若中途有任何返工/重试 → 也追加 lessons-learned.md（避免下次重复路径）
 

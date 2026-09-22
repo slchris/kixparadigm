@@ -705,6 +705,40 @@ QA 通过 GitHub 远程文件工具写入测试、fixture 或 QA 文档时，Pos
 字段视为 L2/QA 未完成，重新运行当前 revision 的全量 L2→QA 链；不得把旧报告手工补字段当作
 新鲜证据。已完成且不再接力的历史 Sprint 保留原证据，不回写。
 
+### verifiable_gates 的宿主能力维度（v5.8，2026-09-22；Sprint 2 T1 引入）
+
+> 来源：Sprint 1 的实证 —— 能力型 `skip` 与 `pass` 在 `node --test` 汇总里同样让进程 exit 0，
+> 「跳过」于是被下游读成「通过」（lessons-learned LL-1）。本维度把宿主能力从**文案约束**升为 **schema 一等字段**。
+
+plan.md 的 gate 记录（`verifiable_gates.*` 下的每一条）可声明：
+
+```yaml
+- id: LG10
+  type: local_gate
+  cmd: "node --test skills/kixpower/tests/ps1-parity.test.js"
+  expect: "..."
+  required: true
+  host_requires: [pwsh]        # 该 gate 取得有效证据所必需的宿主能力（可执行文件名）
+```
+
+`host_requires` 是**能力声明**，不是运行依赖：产品交付物不得因此新增外部依赖；它只描述
+「这个 gate 在什么宿主上才可能产出有效证据」。
+
+**三态输出（替代 skip / pass 二值）**：
+
+| 取值 | 含义 | 是否计入通过 |
+|---|---|---|
+| `pass` | 门禁在**本宿主**上真实执行且判据成立 | ✅ |
+| `fail` | 真实执行且判据不成立 | ❌（unmet） |
+| `unavailable` | `host_requires` 中的能力在本宿主缺失（探针 `ENOENT`），**证据通道不存在** | ❌（不计入通过，也**不得**记为 skip） |
+
+**硬约束**：
+
+1. **required gate 为 `unavailable` 时不得计入 `l2_verification_passed`**：`l2_verification_passed` 只能包含在 `l2_verified_sha` 那一 revision 上真实 `pass` 的 gate id；`unavailable` 的 gate 必须在 L2 证据里显式登记为 `unavailable`（写明缺哪条能力），不得省略或折叠成 pass。
+2. **不得用 `skip` 语义承载 `unavailable`**：`skip` 通常不改变进程退出码（LL-1），会把「缺能力」静默变成「绿」。测试侧的可机械区分实现：进程非 0 + stdout/诊断出现状态行 `parity: unavailable`（与 `parity: FAIL` 的状态行互斥）。
+3. **能力缺失不等于 FAIL**：`unavailable` 走**降级路径**（写明缺哪条证据 + 可判定 falsifier），不阻塞与该证据无关的交付；但相应 claim 必须降级，不得表述为「已证」。
+4. `host_requires` **不进**本节 L2 manifest 的规范 field_set（`{id,type,cmd,expect,required}`）；Sprint 2 起 L2 manifest 可额外规范化该维度，但同一 Sprint 内必须口径一致。
+
 ### Partition 产物（仅 parallel/hybrid 拓扑用，v5.7）
 
 > 来源：AdaptOrch §4.4.1 + 9 Ways 报告 + S-Bus (arXiv 2605.17076, 并发 agent race condition)。多个 Dev 并行时**必须**分区写 progress.md，防数据丢失。

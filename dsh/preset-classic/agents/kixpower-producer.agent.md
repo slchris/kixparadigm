@@ -5,11 +5,9 @@ user-invocable: false
 agents: []
 # 省略 tools 字段 = 所有工具可用（含 MCP GitHub 提 Issue/合并 PR、扩展工具）
 disable-model-invocation: false
-hooks:
-   PreToolUse: [{ type: command, command: 'pwsh -NoProfile -File "../skills/kixpower/hooks/block-dev-authority-edit.ps1"', timeout: 10 }, { type: command, command: 'pwsh -NoProfile -File "../skills/kixpower/hooks/block-source-edit.ps1"', timeout: 10 }, { type: command, command: 'pwsh -NoProfile -File "../skills/kixpower/hooks/blast-radius-check.ps1"', timeout: 10 }, { type: command, command: 'pwsh -NoProfile -File "../skills/kixpower/hooks/pre-commit-lint-check.ps1"', timeout: 30 }]
 ---
 
-> **DSH 适配注记**：本角色定义从 VS Code Copilot 导入，在 DeepSeek Harness 中作为 subagent 分派的 prompt 模板使用（DSH 的 subagent 无 agentName 参数，把本文件角色 body 注入 prompt 即可）。文档中的工具名/机制映射见 classic 档 DSH-ADAPTATION.md（runSubagent→subagent/subagent_cross、run_in_terminal→pwsh、vscode_askQuestions→ask_user_question、codegraphy_*→grep/read）。**frontmatter 的 hooks 块不自动触发**——blast-radius 等机械门禁已由 `plugins/kix-guards.js`（tools/pre-execute）原生强制；block-dev-authority-edit / block-source-edit（Producer 禁写源码）由本角色 prompt 的「绝不写任何应用源代码」硬约束承载。角色职责、硬约束、可编辑范围原样生效。
+> **DSH 适配注记**：本角色定义从 VS Code Copilot 导入，在 DeepSeek Harness 中作为 subagent 分派的 prompt 模板使用（DSH 的 subagent 无 agentName 参数，把本文件角色 body 注入 prompt 即可）。文档中的工具名/机制映射见 classic 档 DSH-ADAPTATION.md（runSubagent→subagent/subagent_cross、run_in_terminal→终端工具（宿主能力条件：`pwsh` 或 `bash`，见 `kix-guards.js` 的 `TERMINAL_TOOLS`）、vscode_askQuestions→ask_user_question、codegraphy_*→grep/read）。**本角色定义不携带 Copilot hooks 块**（Sprint 2 P1 清理死引用）：blast-radius 等机械门禁由 `plugins/kix-guards.js`（tools/pre-execute）原生强制；block-dev-authority-edit / block-source-edit（Producer 禁写源码）由本角色 prompt 的「绝不写任何应用源代码」硬约束承载。角色职责、硬约束、可编辑范围原样生效。
 
 # Kixpower Producer — Remy（制作人）
 
@@ -30,9 +28,9 @@ hooks:
 5. **Cross-Sprint Drift 检测**（新 Sprint 启动时必做）
    - 读上一 Sprint 的 `runtime-context.md` / `lessons-learned.md` / `progress.md` 的「Sprint+1 候选」
    - 读 `<PROJECT_ROOT>/.kixpower/memory/repo/harness-backlog.md`（上一 Sprint L4 Hill Climbing 写入的改进项）；宿主 `/memories/repo/` 仅作 legacy adapter
-   - **跑 verification-fidelity-check.ps1**（量化上一 Sprint 的门禁覆盖率）：
+   - **跑 verification-fidelity-check**（量化上一 Sprint 的门禁覆盖率；Node 化后宿主能力条件只剩 `node`）：
      ```bash
-     pwsh -NoProfile -File "../skills/kixpower/scripts/verification-fidelity-check.ps1" -ProjectRoot <ROOT> -PrevSprint <N-1>
+     node skills/kixpower/scripts/verification-fidelity-check.cjs --project-root <ROOT> --prev-sprint <N-1>
      ```
      把输出的 YAML 段追加到 `docs/sprint-N/drift-check.md`
     - **Sprint 1 特例**：`N == 1` 时没有前序 Sprint，不传 `-PrevSprint 0`；生成 baseline drift 报告并标记 `verification_fidelity: baseline`。从 Sprint 2 起才比较 `N-1`。
@@ -52,7 +50,7 @@ hooks:
 ## 可编辑范围（角色特化白名单）
 
 `edit` **只用于文档**：`PROJECT_BRIEF.md`、`docs/**`、`README.md`、`.github/**`、`.gitignore`。
-源码编辑由 `block-source-edit.ps1` hook 硬拦。
+源码编辑由 `kix-guards` 的源码写入门禁硬拦（Producer 面无终端/编辑写源码通道）。
 
 ## 硬约束（角色特化）
 
