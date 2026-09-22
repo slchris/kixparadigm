@@ -260,7 +260,7 @@ md5 复核（MG5）：
     - docs/sprint-1/hill-climbing.md
     - docs/qa/qa-signoff-1.md
   result: observed
-  note: "收尾 commit 的变更面经 `git diff --name-only a3cdfb1..HEAD` 机械核对：仅 docs/**、PROJECT_BRIEF.md、.kixpower/memory/repo/**（纯文档），无 code/test/fixture/构建配置/gate 命令改动 → L2 与 QA 证据的绑定 revision 仍为 a3cdfb1，不触发 freshness 失效；并在 6d72201 上复跑 LG1/LG2 作为收尾冒烟。"
+  note: "收尾 commit 的变更面经 `git diff --name-only a3cdfb1..HEAD` 机械核对：仅 docs/**、PROJECT_BRIEF.md、.kixpower/memory/repo/**（纯文档），无 code/test/fixture/构建配置/gate 命令改动 → L2 与 QA 证据的绑定 revision 仍为 a3cdfb1，不触发 freshness 失效；并在收尾 HEAD 上复跑 LG1（25→20/0/5, exit 0）与 LG2（CONSISTENCY OK, exit 0）作为收尾冒烟。最终 HEAD 以 `git rev-parse HEAD` 为准（收尾 commit 经一次 amend 以并入 HB-6 与本次对账记录）。"
 ```
 
 ## T2 取证区（T2 步骤 A 必须在此落盘，供 MG3 校验）
