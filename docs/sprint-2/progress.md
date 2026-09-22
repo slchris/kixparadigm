@@ -571,6 +571,18 @@ blast_radius:
     QA 的 `CONDITIONAL` 判定与 §12「本 Sprint 不因本报告获得发布许可」在 `done.md` 中**逐字保留**。
     Sprint 3 入口：F-3/F-4/F-5/F-6 登记项 + H-set-B 6 个 hook（N9）+ `>20%` 规则的**可判定窗口复核**（drift-check §9）+ HB-8..HB-11。
   l2_manifest: null
+- at: 2026-09-22
+  stage: l4_independent_observation
+  stage_signal: orchestrator 对收尾层「4 项 HB 晋升 `validated`」的独立核验（**晋升属改变后续行为的 claim，不得默认成立**）
+  actor: kixpower-orchestrator
+  scope: "`.kixpower/memory/repo/harness-backlog.md` 的 HB-1 / HB-3 / HB-4 / HB-5 晋升判定（Producer 自设试验 + 自判结果）"
+  findings:
+    - "**HB-3 ✅ 成立**：其 `note` 引用的逐段终态 `23/0/1 · 20/20 · 59/0/1 · 35/0/1` 与 orchestrator **独立 L2 实跑逐项一致**（非引用 Producer 读数）"
+    - "**HB-5 ✅ 成立（最强）**：改进项 (b)「提供平台无关实现（Node）」已落地为 `kixpower-contract.cjs`，且 QA 在冻结 revision 上**本地复算 digest 成功**（`qa_gate_manifest_recompute: reproduced`）——Sprint 1 该项的原始痛点被机械消除"
+    - "**HB-4 ✅ 成立**：判据 (a) 有真实证据（LG15 mutation probe 首版**假绿**——子进程继承父环境致孙进程 0 退出——被捕获并修正，恰为本项要防的形态）；判据 (b) 前提本 Sprint 未出现，属**当空判据**（已在 `note` 披露）"
+    - "**HB-1 ⚠️ 成立但证据链最弱（登记为带保留的 `validated`）**：判据 1–2 有证据（新 bash 用例走平台前提绑定的可识别 skip 通道；parity 用例走三态能力探针）；但**判据 3（「无 pwsh = 5 skip」）被 trial 自身动作（T4 消除 pwsh 依赖）变为空判据**，且 `pass_criteria` 是在**判定时由判定方自己修订**。Producer 已显式登记该修订（故不构成隐瞒），但同一角色对 HB-6 的同类情形（「改进已应用但结果无判别力 ⇒ 无效试验」）判的是 `pending` —— **两处标准不完全一致**。裁决：**接受晋升，但 HB-1 的证据强度不得与 HB-3/HB-5 等同叙述**，其证明力不得作为 Sprint 3 的强先例"
+    - "**过程归属不一致（登记）**：`harness-backlog.md:565` 规划期写 trial「**待 QA 判定**」，而 `docs/qa/qa-signoff-2.md` 全文**零 HB trial 判定**（HB 仅作为 LG12 计数与 MG4 fixture 出现）→ 4 项 trial 实际由 **Producer 在收尾层自判自设的试验**。origin（Sprint 1）≠ trial（Sprint 2），故不属「自我确证」；但**判据设计者与判定者同一**仍是弱化因素。**Sprint 3 建议**：plan 必须显式指定 trial 判定的**执行角色**且不得与判据设计者同一，或由 QA 在签署档内设独立 `evals_verdict` 段"
+  l2_manifest: null
 ## 阻塞与风险（实时）
 
 | # | 项 | 级别 | 当前处置 |
