@@ -235,6 +235,33 @@ en/preset-classic-en/ ──npm───▶ kixparadigm-classic-en
 > 证据锚点改为**既有 JS 测试网**（`kix-guards.test.js` 696 行 / 159 断言）+ characterization + 负向控制；
 > **禁止**把「characterization 绿」写成「与原 `.ps1` 等价」。细节见 `docs/sprint-2/plan.md` §12 / §16.2。
 
+### Sprint 2 收尾（2026-09-22）→ `status: done` · `release_eligible: false` · `ci_pending: true`
+
+> 完整报告：`docs/sprint-2/done.md`；QA 签署：`docs/qa/qa-signoff-2.md`（**`CONDITIONAL`**，唯一理由 = CI gate pending；
+> **无 P0/P1、无 gate 失败**）；L4：`docs/sprint-2/hill-climbing.md`。
+> 证据 revision = **`42d3c7efdd1dfcdf8aba4ba933713547d83e5247`**（= `l2_verified_sha` = `qa_verified_sha`；C5 收尾层 sha 以 `git rev-parse HEAD` 为准）。
+
+- **交付**：**9 任务 / 9 done / 0 blocked**（T1–T5 + T6–T9）；required local_gate **13/13 exit 0** @ `42d3c7e`（QA 独立复跑）；
+  MG1–MG10 全绿；manifest digest `5f4eab16…` **由 canonical 实现产出且 QA 本地复算逐位一致**（Sprint 1 的不可复算项闭合）。
+- **提交**：C1 `affc9c7` · C2 `1479a35` · C3 `27fe7f6` · C4 `42d3c7e` · C5（收尾层）= **5 / 预算 6 → `over_budget: 0`**（但归因不纯净，见下）。
+- **「有 pwsh 时与 `.ps1` 差分逐字节一致」未达成**：LG10 = `unavailable`（1 pass/7 fail/**0 skip**，exit 1）→ E1 唯一通道 = **CG4（CI，pending）**；
+  **不得**把 `LG9/LG15` 的绿表述为「与原 `.ps1` 等价」。
+- **两条必须带走的诚实记录**：① **`>20% → 强制扩展 target_rules` 规则被触发（23.4% / 27.8% > 20%）但未按规则处置**——
+  Sprint 2 的目标集是「覆盖优先」的**事后巧合而非合规**，结转 Sprint 3（`drift-check.md` §9）；
+  ② QA 的 `CONDITIONAL` 与其 §12「**本 Sprint 不因本报告获得发布许可**」在 `done.md` §8 **逐字保留**；
+  orchestrator 的档位裁决 = `done` + `release_eligible: false`（`done` 与发布可用性解耦，理由与 falsifier 见 `done.md` §8.4/§8.5）。
+
+**下一步（Sprint 3，按优先级）**：
+
+1. **`>20%` 规则的真正处置**：以 `--prev-sprint 2`（baseline `ef6a485`）复核；若仍 >20% ⇒ 机械扩展 Sprint 3 的 `target_rules` 覆盖 Sprint 2 漏检面。
+2. **CI 取证（`release_eligible` 唯一开口）**：授权 PR 后按 **CG1 → CG2 → CG4/CG5 → CG3** 依次取证；
+   CG4 必须核对三态状态行与 `exit` 映射（`unavailable` 在 job 层表现为**红**，见 R-6）；CG5 必须给出 windows-latest 上 `install.ps1` 的「正常 0 + 注入哨兵非零」双向日志。
+3. **H-set-B 6 个 hook Node 化**（`validate-handoff` / `validate-qa-signoff` / `qa-freshness-check` / `cleanup-qa-session` / `auto-update-progress` / `pre-commit-lint-check`）——
+   在无 pwsh 宿主上这 6 条声明**不触发**（= 不是已生效门禁）；其中 validate-qa-signoff + qa-freshness + cleanup **必须同批**。
+4. **真实宿主语义取证**（OQ8 spawn 失败 = `deny`/`ignore`；OQ9 真实载荷 schema）——决定 F-4 定级与那 6 条声明的行为。
+5. **F-3 / F-4 / F-5 / F-6 的修法**（全部属**产品码** ⇒ 需新 revision + QA 重签）：installer 作用域收窄 + 原子性 · `TOOL_LIKE_KEY` 补 `arguments`/`parameters`/`function` · `hooks/README.md` 入镜像组 · 判据强度（marker 不得复用成功路径文案）。
+6. **HB-8..HB-13** 六项 candidate（维护调用点检索面 / 结论与证据同源 / installer 作用域 / 未知形态敞口 / 文档类三面守护 / 判据强度）+ 已晋升 `validated` 的 **HB-1/3/4/5** 作为既定实践应用并监测回归。
+
 ## 9. 风险登记（固定锚点）
 
 | ID | 风险 | 影响 | 现有缓解 | 状态 |
@@ -324,6 +351,20 @@ en/preset-classic-en/ ──npm───▶ kixparadigm-classic-en
 > 3. 因此本 Sprint 的 hook 引擎采用「**单一 core（skills 面）+ 双侧同源断言**」，而**不是**跨面 `require`。
 
 **改动纪律**：任何 `dsh/**` 或 `en/**` 源码改动**必须**同步其副本组；`scripts/install-lib.js` 必须同步 `en/scripts/install-lib.js`。
+
+> **Sprint 2 收尾的第三次修订（追加，不改写上表与前两段追加；以 @ `42d3c7e` 的实测为准）**：
+> 新增 `.cjs` / `.md` 的 identity 语义**实际落地形态**如下（QA MG5 / §8(C) 逐组 md5 复核）。
+>
+> | 副本集 | 成员 | 守护检查 | 实测 |
+> |---|---|---|---|
+> | **11 组三面镜像（`SPRINT2_NODE_ARTIFACTS`）** | `skills/kixpower/{scripts,tests,hooks}/**` 的 Sprint 2 新增 `.cjs`/`.js` 产物（含 `kix-verdict.cjs`、4 个 hook 入口、`hook-engine.test.js`、3 个移植脚本、`trust-chain/ps1-parity` 测试） | `checkIdenticalSet`（`consistency-lib.cjs`，T4 登记） | **11 组 × 3 副本各 1 个 md5 取值** ✅ |
+> | **`consistency-lib.cjs`（4 副本）** | `dsh/preset{,-classic,-null}/plugins/` + `en/preset-classic-en/plugins/` | `checkPluginPair` / `checkIdenticalSet` | `a85788de9c1402c02221aa6a1159593a` 同值（4 副本）✅ |
+> | **`.md` 类新增产物** | `skills/kixpower/hooks/README.md`（3 副本） | **无** —— `grep -n 'README.md' consistency-lib.cjs` = **0 命中** | 3 副本当前 md5 一致（`ea8ce56f…`），**今天一致、将来漂移静默** ⇒ **QA F-5 / HB-12**（上段追加曾把它写作受 `checkIdenticalSet` 守护，**实测不符**，此处更正） |
+> | **单副本（无 identity group）** | `install.sh`、`install.ps1`、`scripts/sync-dsh-preset.cjs`、`scripts/copilot-installer.test.js`、`.github/workflows/ci.yml` | 仅 `checkSyntax` / 测试自身 | ✅（`install.ps1` 的可执行验证只能走 CI = CG5） |
+>
+> **`checkSyntax` 的 symlink 盲区已修（T4）**：`consistency-lib.cjs:26-34` 的 `walk()` 不跟随 symlink ⇒ 补 `checkSyntax({root, rel:'dsh/preset-classic'})` 后，
+> 语法面输出中出现 `dsh/preset-classic: 37 JS/CJS/MJS syntax OK`；`dsh/preset: 35` 与 `classic: 37` 的差值经 QA 定位为 `skills`/`agents` symlink 不被跟随（同一物理文件经 classic 面被解析）——即**行的差额是覆盖增益，不是漂移**。
+> **新增的 `.cjs` 一律遵守**：写进 `skills/**`（两个发行面的唯一交集）+ 同步 3 副本 + 登记 `checkIdenticalSet`；`.md` 类产物在 HB-12 落地前**必须显式声明不受守护**。
 **Sprint 1 实际改动面**（`git diff --name-only c3c31eb..HEAD` 共 18 文件）：`scripts/**`、`en/scripts/install-lib.js`（镜像）、
 `.github/workflows/ci.yml`、`CHANGELOG.md`、4 个 `**/plugins/kix-focus.test.js`（**测试夹具**，经 plan §2 修订授权）与规划/收尾文档；
 **产品源码零改动**（4 个 `kix-focus.js` 副本 md5 均为 `52346442ca28b753ff9ad9ef7856242c` = baseline 值，`git diff --name-only c3c31eb..HEAD -- '**/kix-focus.js'` 为空）。

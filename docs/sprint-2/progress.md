@@ -1,6 +1,6 @@
 ---
 sprint: 2
-status: in_progress
+status: done
 last_updated: 2026-09-22
 completed_tasks: 9
 total_tasks: 9                          # T1..T5（plan.md §4）+ T6..T9 = H-A..H-D（§13，2026-09-22 增量重规划追加）；HB-6 scoped trial 的收尾层由 task_sizing_v2.closeout_layer 承载，不占 task 位
@@ -16,11 +16,10 @@ artifacts_changed_since_last_observe:
   - skills/kixpower/TEAM_CONVENTIONS.md（+2 preset 副本：host_requires / unavailable 三态 schema）
   - dsh/preset-classic/agents/*.agent.md（5 个死 hooks 块删除 + 措辞收敛）
   - en/preset-classic-en/agents/*.agent.md（同上 5 个）
-  # ── 未提交 WIP（T2/T3/T4，归属见 plan §12.3；WIP 存在 ≠ 任务完成）──
+  # ── 层 2 已提交（C3 = 27fe7f6：T2 + T3 + T6）—— 原标题「未提交 WIP」不属实，C5/F-7 修订 ──
   - skills/kixpower/scripts/validate-memory-backlog.cjs（+2 preset 副本）
   - skills/kixpower/scripts/verification-fidelity-check.cjs（+2 preset 副本）
-  - scripts/sync-dsh-preset.cjs（单副本）
-  - skills/kixpower/tests/{trust-chain,ps1-parity}.test.js（WIP 扩展 parity 覆盖到 validator/fidelity；各 3 副本）
+  - skills/kixpower/tests/{trust-chain,ps1-parity}.test.js（WIP 收口；各 3 副本）
   - prompts/kixpower-new.prompt.md（+2 preset 副本）、skills/kixpower/USAGE_MANUAL.md（+2 preset 副本）、agents/kixpower-producer.agent.md
   # ── 层 2 已提交（T2 + T3 + T6，见下 Trace Log `dev_layer2`）──
   - skills/kixpower/hooks/lib/kix-verdict.cjs（+2 preset 副本；payload 归一化 + 逐字移植自 kix-guards 的判定层）
@@ -52,7 +51,7 @@ dev_self_tests_passed:
   - "node --test skills/kixpower/tests/hook-engine.test.js @ T6 — **44 tests / 44 pass / 0 fail / 0 skip**（LG15；含 §6 mutation probe：改坏 core 的临时副本 ⇒ 子套件 16 个 not ok、进程非 0）"
   - "node --test skills/kixpower/tests/trust-chain.test.js @ T2+T3 — **23 tests / 23 pass / 0 fail / 0 skip**（LG9；E3 冻结凭据复算 + T2/T3 characterization；原 1 红「12 required gate」已按 §16.5 v2 口径修订为 13 + LG10 非 required 断言）"
   - "node skills/kixpower/scripts/validate-memory-backlog.cjs --project-root . @ T2 — exit 0；`record_count: 7` / `legacy_unstructured_records: 0`（LG12 判据：**7 而非 plan §4-T2 验收写的 6** —— 增量重规划期 Producer 追加 HB-7 记录，见 `U2-parity:` 行）"
-  - "node skills/kixpower/scripts/verification-fidelity-check.cjs --project-root . --prev-sprint 1 @ T3 — exit 0；`total changed: 46` / `in_scope (rules): 17` / `whitelisted: 29` / `ungated: 0 (0%)` → `PASS`（LG11）"
+  - "node skills/kixpower/scripts/verification-fidelity-check.cjs --project-root . --prev-sprint 1 @ T3 — exit 0；输出读数（**C5/F-1 修订，原文误记为 `46/17/29` + `ungated: 0 (0%)` → `PASS`**）= `total changed: 64` / `in_scope (rules): 17` / `whitelisted: 32` / **`ungated: 15 (23.4%)`** / `HIGH_RISK`（**无 `PASS` 行**）；窗口 = `--prev-sprint 1` ⇒ baseline `c3c31eb`，覆盖 **Sprint 1 + Sprint 2**（R-5）；QA 在冻结 revision `42d3c7e` 的权威复跑 = `79 / 18 / 39 / 22 (27.8%)`（LG11 的 exit 0 字面判据成立，**但不得据此声称覆盖率 PASS** —— 见 `drift-check.md` §9）"
   - "npm run test:installer @ 层 2 — **25 tests / 20 pass / 0 fail / 5 skip**（T4 未完成，与规划期基线一致，无新增假绿）"
   - "npm run test:consistency @ 层 2 — exit 0（新增 hooks 面 3 副本字节一致组由 T4 登记；当前守护面不覆盖 skills/**，F5）"
   - "MG8 预核 @ T6 — `ls skills/kixpower/hooks/*.ps1 | wc -l` = 10（H-D 保留，T9 复核）；4 个 Node 入口 ×3 副本 md5 各 1 个取值"
@@ -63,15 +62,30 @@ dev_self_tests_passed:
   - "MG8 静态判据 @ T7 — `grep -c 'HOOK_LAUNCHER\|HOOK_EXT' install.sh install.ps1` = **0 / 0**（原 4 / 4）；`grep -c 'node \"{{COPILOT_HOME}}/skills/kixpower/hooks/' agents/*.agent.md` = **8 行 / 10 个声明 / 4 个 distinct hook**（producer 的 4 命令单行数组按 1 行计）"
   - "MG10 静态判据 @ T8+T9 — 3 副本 `hooks/README.md` md5 一致（1 个取值）；`ls skills/kixpower/hooks/*.ps1 | wc -l` = **10**（未删除任何 `.ps1`；三面 30 文件零改动）"
   - "install.sh 端到端 @ T7 — 真装进临时 `COPILOT_HOME`：exit 0、`grep -r '{{' <tmp>/agents` = 0 行、`skip: chmod +x (0 .sh files)`（无 ok 级 chmod 播报）；负向：注入 `{{KIX_RESIDUE_PROBE}}` → exit 1 + `KIX-INSTALLER-RESIDUE`；PATH 无 node / node v18.4.0 stub → exit 1 + `KIX-INSTALLER-NO-NODE`"
-l2_verification_passed: []              # placeholder — 仅 orchestrator 可写；本 Sprint 规划期尚未发生 L2
-l2_verified_sha: null                   # placeholder — 完整 40 位 SHA
-l2_gate_manifest_sha256: null           # placeholder — 规范化规则见 plan.md §7.2（HB-5 scoped trial 的交付）；**必需集合 v2 = 13 条（plan §16.5）**
-l2_stash_refs: []                       # placeholder — L2 完成时 git stash list --format=%H 快照
-qa_started_sha: null                    # placeholder — QA 启动时必须 == l2_verified_sha == HEAD
-qa_verified_sha: null                   # placeholder — QA PASS/CONDITIONAL 证据对应的完整 HEAD
-qa_gate_manifest_sha256: null           # placeholder — QA 签署时复核的同一 local_gate manifest
+l2_verification_passed: [LG1, LG2, LG3, LG4, LG5, LG6, LG7, LG8, LG9, LG11, LG12, LG15, LG16]
+                                        # orchestrator 独立复跑（非采信 Dev 自报）：13/13 required local_gate exit 0
+                                        # 计数：LG1 32/32/0/**0 skip**（25→32，skip 5→0）· LG3 23/0/1 · LG4 20/20 ·
+                                        # LG5 60→59/0/1 · LG6 npm test exit 0 · LG7 35/0/1 · LG8 en npm test exit 0 ·
+                                        # LG9 23/23/0/0 · LG15 44/44/0/0 · LG16 7/7/0/0 · LG11 fidelity exit 0
+                                        # （首度量 ungated_ratio_pct 27.8，Sprint 1 为 baseline_degraded）·
+                                        # LG12 memory valid / record_count 7。LG10 = required:false（本机永久 unavailable，不入本清单）
+l2_verified_sha: 42d3c7efdd1dfcdf8aba4ba933713547d83e5247
+l2_gate_manifest_sha256: 5f4eab16a3664356bed5317dd1de77a2c67487fce132e0f3475256abb15e2976
+                                        # **由 canonical 实现产出**（skills/kixpower/scripts/kixpower-contract.cjs，
+                                        # 非 Sprint 1 的临时脚本）；field_set = {id,type,cmd,expect,required,host_requires}
+                                        # 三方一致：plan required(13) == L2 verified(13) == manifest(13)；
+                                        # gateManifestConflicts = []；stash = []；工作树 dirty = 0
+l2_stash_refs: []                       # L2 完成时 git stash list --format=%H 快照（空）
+qa_started_sha: 42d3c7efdd1dfcdf8aba4ba933713547d83e5247
+qa_verified_sha: 42d3c7efdd1dfcdf8aba4ba933713547d83e5247   # = QA 签署证据对应 revision（C5 前最后一层）；QA 报告 frontmatter 同值
+qa_gate_manifest_sha256: 5f4eab16a3664356bed5317dd1de77a2c67487fce132e0f3475256abb15e2976   # QA 用 canonical 实现本地复算，逐位一致
+qa_status: CONDITIONAL                   # 唯一理由 = ci_pending；无 P0/P1、无 gate 失败（qa-signoff-2.md §12）
 qa_test_changes: []
 qa_session_marker: docs/.kixpower-qa-session.json
+final_head: 42d3c7efdd1dfcdf8aba4ba933713547d83e5247
+                                        # **签署冻结的 evidence revision**（L2 13/13 + QA 复跑 + 签署均绑此值）。
+                                        # C5 收尾层自身的 sha **无法自含**于本文件（commit 不能包含自身 hash，且 amend 被硬禁）
+                                        # → C5 的 sha 以 `git rev-parse HEAD`（本文件所在提交）为准，见 Trace Log `producer_closeout`。
 ci_pending: true                        # 规划期 CI 未跑；CONDITIONAL 只能因 CI gate pending（R4 open）→ CG4/CG5 亦 pending
 topology_used: sequential               # plan.md §14 properties = sequential（force_sequential: true；公式给 hybrid，ω=7/γ=0.41）
 # === 规划期实测的宿主能力事实（本 Sprint 的核心前提）===
@@ -99,7 +113,7 @@ blast_radius:
 |---|---|---|---|---|
 | T1 | 等价性取证基座：`kixpower-contract.ps1`(517) → `.cjs` + parity/characterization 骨架 + `host_requires`/`unavailable` 语义 + oracle 决策落盘 | [x] | — | 契约模块被 T2/T3 直接消费（`validate-memory-backlog.ps1:11` / `verification-fidelity-check.ps1:17` 均 dot-source）|
 | T2 | `validate-memory-backlog.ps1`(89) → `.cjs` + 关闭 U-2 对拍 + `prompts/kixpower-new.prompt.md:80` 调用点改写 | [x] | T1 | 层 2 完成：LG12 实测 exit 0（`record_count: 7`）；`U2-parity:` 三方对照 = 与 Sprint 1 即兴移植**逐字节一致**（3 fixture）|
-| T3 | `verification-fidelity-check.ps1`(320) → `.cjs` + `USAGE_MANUAL.md:365` / producer agent 调用点改写 + 首次真实运行追加 `drift-check.md` | [x] | T1 | 层 2 完成：LG11 实测 exit 0（`ungated: 0 (0%)` → PASS，`baseline_degraded` 解除）；输出已追加到 `drift-check.md` §8 |
+| T3 | `verification-fidelity-check.ps1`(320) → `.cjs` + `USAGE_MANUAL.md:365` / producer agent 调用点改写 + 首次真实运行追加 `drift-check.md` | [x] | T1 | 层 2 完成：LG11 实测 exit 0；读数 = **`ungated: 15 (23.4%)` / `HIGH_RISK`（无 `PASS` 行；窗口 = Sprint 1 + Sprint 2）**，`baseline_degraded` 解除（指标可量化，但**非 PASS**）；**C5/F-1 修订**：原文「`ungated: 0 (0%)` → PASS」与 `drift-check.md` §8 自身逐字块矛盾，已按实际读数改正；输出已追加到 `drift-check.md` §8 |
 | T4 | `scripts/sync-dsh-preset.ps1`(197) → `.cjs` + 5 条 pwsh 类 skip 归零（`test:installer` 25/0/5 → 25+N/0/0）+ **全部新增 `.cjs` 镜像登记（含 T6 的 15 个 hooks 文件）** + 修 `checkSyntax` symlink 盲区 | [x] | T1, T6 | 层 3 完成：`test:installer` = **32 / 32 pass / 0 fail / 0 skip**（N=7 实测）；11 组三面镜像登记 + `dsh/preset-classic` 语法守护（37 文件）；`consistency-lib.cjs` 仍单写入者 |
 | T5 | P1：清 DSH 面向副本的 10 个死 `hooks:` 块（classic 5 + en 5）+ 收敛失效措辞 | [x] | — | **不删 `hooks/*.ps1`**；不动 root 的 Copilot 分发版（`agents/`）|
 | **T6** | **H-A 单一 hook 引擎**：`hooks/lib/kix-verdict.cjs`（payload 归一化 + 从 `kix-guards.js __internals` 逐字抽取的判定层）+ 4 个 Node 入口（各 3 副本）+ `hook-engine.test.js`（细粒度 + 负向控制 + mutation probe + 同源函数体断言）+ CI 侧 E1 step 与 parity 退出码修订 | [x] | T1 | 层 2 完成：LG15 = **44 tests / 44 pass / 0 fail / 0 skip**（含 mutation probe 自证红）；4 个 hook 入口 ×3 副本 md5 一致；`kix-guards.js` 4 副本**零改动** |
@@ -111,8 +125,8 @@ blast_radius:
 遗留项（非任务缺口，已逐条登记）：`install.ps1` 可执行验证归 CG5（本地无 pwsh）、`parity: unavailable` 退出码 2 的机制冲突（D-5）、真实 Copilot 载荷 schema 未取证（OQ9/OQ8）。
 
 **DAG v2 分层与提交映射**（plan §14/§15，**每 DAG 层合并 1 个 commit 是硬要求**）：
-`[T1,T5]` → C1 `affc9c7`（**已提交**）；`[T2,T3,T6]` → C3 `27fe7f6`（**已提交**）；`[T4,T7,T8,T9]` → C4（**已提交**，sha 见 Trace Log `dev_layer3`）；C2 = `1479a35` 增量规划文档；C5 = 收尾层。
-**commit_budget 消耗**：6 中的 4（C1/C2/C3/C4）；C5 收尾层预留 1。
+`[T1,T5]` → C1 `affc9c7`（**已提交**）；`[T2,T3,T6]` → C3 `27fe7f6`（**已提交**）；`[T4,T7,T8,T9]` → C4 **`42d3c7efdd1dfcdf8aba4ba933713547d83e5247`**（**已提交**，C5 回填；= L2/QA 签署冻结的 evidence revision）；C2 = `1479a35` 增量规划文档；C5 = 收尾层（`done.md` + `hill-climbing.md` + L4/memory + F-1/F-2/F-7 修正；**C5 自身 sha 以 `git rev-parse HEAD` 为准**）。
+**commit_budget 消耗**：6 中的 **5**（C1/C2/C3/C4/C5）→ **`over_budget: 0`**（余量 1 未用；详见 `done.md` §6）。
 **总预算 6（绑定值）= min(公式 9, 环境硬约束 1h/10-commit 与用户 ≤6 指令)；预计 5，余量 1。**
 
 > **T1 移交 T2/T3 的契约面**（消费者只需这些）：`frontmatter / yamlScalar / yamlList / inlineYamlList / indentedBlocks / planGateRecords / requiredLocalGates / gateManifestConflicts / gateManifestJson / sha256Hex / isSha`（plan.md §4-T1 步骤 A 清单；hooks 侧 helper 显式不移植）。
@@ -208,7 +222,8 @@ blast_radius:
   value: 契约模块三副本 md5 一致（fb457d327f0ad81a161bfb1ed7510196）；LG9 = 13/13（含负向控制见 T2 追加）；ps1-parity 的 oracle 输入（参照实现 .ps1）存在性由 harness 自检断言；§7.2 可复算性由 fixture 的**逐字 manifest 字符串**断言（非仅「测试绿」）
 - tag: U2-parity
   value: >-
-    U-2 关闭：**逐字节一致**。对照源 = Sprint 1 即兴移植 `/tmp/kix-validate-memory-backlog.cjs`（本机存在，3612B，
+    U-2 关闭：**逐字节一致**。对照源 = Sprint 1 即兴移植 `/tmp/kix-validate-memory-backlog.cjs`（本机存在，**2988B**
+    —— C5/F-7 修订：原文记 3612B 有误，`wc -c` 实测 2988；**实质结论不变**，QA 已独立重放三 fixture 证实 stdout 逐字节相同，
     CLI 为位置参数 `<root>`；本实现为 `--project-root <root>` —— 调用面差异已对齐后比对）。
     三元组实测（同 fixture、同 stdout 逐字节 + exit code）：
     ① repo backlog（`.kixpower/memory/repo/harness-backlog.md`）→ 两者 exit 0、`record_count: 7` / `legacy_unstructured_records: 0`；
@@ -253,7 +268,7 @@ blast_radius:
 - tag: T2-evidence
   value: LG12 = exit 0（三行恒定输出 `memory_backlog: valid` / `record_count: 7` / `legacy_unstructured_records: 0`）；调用点改写实测：`prompts/kixpower-new.prompt.md` 与 DSH/en 副本改为 `node skills/kixpower/scripts/validate-memory-backlog.cjs --project-root <ROOT>`；三副本 md5 一致
 - tag: T3-evidence
-  value: LG11 = exit 0（`ungated: 0 (0%)` → PASS）；**首次真实运行**输出（`[Scope Rules]` + `[Verification Fidelity]` + `fidelity_v5:` YAML）已**追加**到 `docs/sprint-2/drift-check.md` §8（Sprint 1 手工 baseline 报告未改写）；调用点改写 3 处（USAGE_MANUAL + root/DSH producer agent）；三副本 md5 一致
+  value: LG11 = exit 0（**C5/F-1 修订后读数**：`ungated: 15 (23.4%)` → `HIGH_RISK`，**无 `PASS` 行**；原文「`ungated: 0 (0%)` → PASS」与 `drift-check.md` §8 自身逐字块矛盾，已改正）；**首次真实运行**输出（`[Scope Rules]` + `[Verification Fidelity]` + `fidelity_v5:` YAML）已**追加**到 `docs/sprint-2/drift-check.md` §8（Sprint 1 手工 baseline 报告未改写）；调用点改写 3 处（USAGE_MANUAL + root/DSH producer agent）；三副本 md5 一致
 - tag: T6-evidence
   value: 入口 CLI 端到端实测：三形态载荷下 `blast-radius-check.cjs` 均 exit 2 + deny JSON；`block-source-edit.cjs --role orchestrator` 与 `--role producer` 判定不同（exit 2 vs 0）；未知形态载荷 → exit 2 + `KIX-HOOK-UNKNOWN-PAYLOAD`（stdout + stderr 双通道）；`kix-guards.js` 4 副本**零改动**（LG15 的同源断言即其守护）
 - tag: hooks-coverage
@@ -430,6 +445,132 @@ blast_radius:
     T7 的两个 installer 改动面**仅限**失败关闭与占位符层（未动资产策略/拷贝语义/卸载路径）。
     `install.ps1` 的可执行验证归 CG5（本地无 pwsh）——本地只有静态判据，属**残留不确定性**，不记 pass。
   l2_manifest: null
+- at: 2026-09-22
+  stage: l2
+  stage_signal: L2 全量 required local_gate 复跑（**orchestrator 独立执行，非采信 Dev 自报计数**）
+  actor: kixpower-orchestrator
+  artifacts:
+    - /tmp/kix-l2-s2.sh（13 gate runner + 计数抽取，前台复跑）
+    - /tmp/kix-l2-s2-manifest.cjs（**canonical 实现**产出 manifest 凭据，非 Sprint 1 临时脚本）
+  gates:
+    - "13/13 required local_gate exit 0 @ 42d3c7efdd1dfcdf8aba4ba933713547d83e5247"
+    - "LG1 32/32/0/**0 skip**（25→32，N_copilot_installer=7；skip 5→0 = P2 硬判据达成）"
+    - "LG3 24→23/0/1 · LG4 20/20 · LG5 60→59/0/1 · LG6 `npm test` exit 0 · LG7 36→35/0/1 · LG8 `en npm test` exit 0"
+    - "LG9 23/23/0/0 · LG15 44/44/0/0 · LG16 7/7/0/0 · LG11 exit 0 · LG12 exit 0"
+    - "LG10 = required:false（本机永久 unavailable）→ **未计入 l2_verification_passed**，符合「unavailable 不计入通过」"
+  l2_manifest:
+    revision: 42d3c7efdd1dfcdf8aba4ba933713547d83e5247
+    digest: 5f4eab16a3664356bed5317dd1de77a2c67487fce132e0f3475256abb15e2976
+    field_set: [id, type, cmd, expect, required, host_requires]
+    generator: skills/kixpower/scripts/kixpower-contract.cjs
+    consistency: "plan required(13) == L2 verified(13) == manifest(13)；gateManifestConflicts=[]；stash=[]；dirty=0"
+  independent_finding: >-
+    **[已机械证明 · 仍留 QA 证伪通道] Sprint 1 `R-1`/`U-1`/`F-3`/`HB-5` 根因定位**：Sprint 1 的冻结凭据
+    `l2_gate_manifest_sha256 = 46121655…` 与 canonical 实现对同一输入（`docs/sprint-1/plan.md` +
+    `l2_verification_passed` 8 条）产出的 `b533cf26…` **不一致**。定位与证明：
+    (a) 参照实现 `kixpower-contract.ps1:10-20` 的 `Get-KixYamlScalar` 正则
+    `^[ \t]*{key}:[ \t]*(?<value>[^\r\n]*)` **只取行首字面量**，故 `expect: >-` → `">-"`；
+    移植版 `trust-chain.test.js:125`（`assert.equal(lg2.expect, '>-')`）与此**一致**；
+    (b) **机械证明**：对 Sprint 1 实际写入的 manifest 原文（`/tmp/kixbase/l2-manifest.json` 的 `gates` 数组）
+    重算 `sha256(JSON.stringify(gates))` = `46121655…`，**与记录值逐位一致** → 该凭据的 provenance
+    确定为一个**折叠了 YAML 块标量**的临时实现（`/tmp/kix-l2.cjs`，Sprint 1 期无 pwsh 时 orchestrator 手写）；
+    其 manifest 8/8 条 `expect` 均为折叠正文（164 字级），而 canonical 为字面 `">-"`（2 字）；
+    (c) 故 QA 当时 80 组候选规范化复算不出，是**在复算一个非 canonical 的目标**（目标本身即偏离参照实现）。
+    **推论**：Sprint 1 的该凭据**不是 canonical 实现的输出**，不应作为可复算凭据引用；
+    「8 条门禁全绿」的**执行证据不受影响**（那是 exit code 证据，与 digest 无关）。
+    **证伪条件（留给 QA）**：若能在**不折叠**块标量的前提下用 canonical 实现复算出 `46121655…`，
+    或能证明 `/tmp/kixbase/l2-manifest.json` 的 `gates` 数组并非当时被哈希的原文，则本定位错误。
+  l2_manifest_note: >-
+    本 Sprint 的 manifest **canonical 可复算**（HB-5 scoped trial 交付），但须记两条**继承自参照实现的
+    语义弱点**（非本次移植引入）：① 13 条 required gate 中 9 条 `expect` 为字面 `">-"` →
+    manifest 的 `expect` 维度对折叠块**不承载期望正文**；② 所有 required gate 的 `host_requires` 均为 `[]`
+    → 该维度在本 Sprint 凭据中**不承载信息**（唯一有真实宿主要求的 LG10 已移出 required）。
+- at: 2026-09-22
+  stage: l2_sha_backfill
+  stage_signal: C4（层 3）commit sha 回填（层内无法自含，amend 被硬禁）
+  actor: kixpower-producer (Remy)
+  artifacts:
+    - docs/sprint-2/progress.md（本文件；DAG 映射行 + 本条目）
+  backfill:
+    - "C4 = 42d3c7efdd1dfcdf8aba4ba933713547d83e5247（`feat(sprint-2): T4 sync-dsh-preset + T7 installer fail-closed + T8/T9 hook 台账（层 3/3）`）= `l2_verified_sha` = `qa_started_sha` = `qa_verified_sha` = 签署冻结 revision"
+    - "C5（收尾层）自身 sha 不在本文件内 —— 以 `git rev-parse HEAD`（= 本文件所在提交）为准"
+  l2_manifest: null
+- at: 2026-09-22
+  stage: qa
+  stage_signal: QA 签署（CONDITIONAL）— 13/13 required gate 独立复跑 + MG1–MG10 + 15 项负向注入
+  actor: kixpower-qa (Ivy)
+  artifacts:
+    - docs/qa/qa-signoff-2.md（**未改动正文**；Producer 只读）
+    - docs/.kixpower-qa-session.json（本地 marker，**未入库**）
+  gates:
+    - "status: CONDITIONAL（唯一理由 `ci_pending: true`）；`qa_started_sha == qa_verified_sha == l2_verified_sha == HEAD == 42d3c7e`"
+    - "13/13 required local_gate exit 0（QA 独立复跑，非采信自报）；LG10 = required:false 且未计入通过面"
+    - "qa_gate_manifest_sha256 == l2_gate_manifest_sha256 == 5f4eab16…（QA 用 canonical 实现本地复算，逐位一致）"
+    - "MG1–MG10 全绿；LG16 由 QA 自建 15 项注入/控制组证明非恒真；`qa_test_changes: []`（QA 未改任何测试/fixture/源码）"
+    - "ci_gate CG1/CG2/CG3/CG4/CG5 = pending（fork 无 workflow 注册、无本 SHA 的 run、未授权 push/PR）→ **不得记 pass**"
+  findings: "F-1/F-2 = P2；F-3..F-7 = P3；**无 P0/P1、无 gate 失败**"
+  note: >-
+    QA §12 逐字结论：**「否。本 Sprint 不因本报告获得发布许可（`release_eligible` 未建立）。」**
+    F-1（结论行与自身逐字输出矛盾 + 3 处传播）为 `done.md` 之前置；F-2（5 处 pwsh-only 维护调用点）交 C5 收口。
+  l2_manifest: null
+- at: 2026-09-22
+  stage: l4
+  stage_signal: L4 实践学习报告（模式计数 + 两次「主张被独立观察修正」+ 未处置强制规则）
+  actor: kixpower-producer (Remy)
+  artifacts:
+    - docs/sprint-2/hill-climbing.md（新增）
+    - .kixpower/memory/repo/lessons-learned.md（LL-10..LL-13 追加）
+    - .kixpower/memory/repo/harness-backlog.md（HB-8..HB-11 追加 + 统计更新）
+  patterns: "silent_failure: 2 · goal_drift: 0 · l2_failed: 0 · over_budget: 0 · claim_evidence_failure: 2"
+  note: >-
+    两条 claim_evidence 修正**均非推翻**而是**表述不完整/覆盖面过宽被核验收窄**：
+    ① R-1 根因由「折叠 YAML 块标量」单轴细化为主张方遗漏的**双轴**（+「未剥引号」；`fold+剥引号` ≠ 冻结值）；
+    ② LL-9 的覆盖面被核验收窄（`blast-radius-check.ps1` 已归一化形态 1/2/3，真实短板在 `block-*-edit` 三者的
+    `if (-not $argsObj) { exit 0 }`）。**未处置的强制规则**：`>20% → 强制扩展 target_rules` 被触发（23.4%/27.8%）而未依规则处置 → 结转 Sprint 3。
+  l2_manifest: null
+- at: 2026-09-22
+  stage: producer_closeout
+  stage_signal: C5 收尾层 —— F-1/F-2/F-7 修正 + done.md + L4/memory + Brief 更新（**单 commit，docs-only**）
+  actor: kixpower-producer (Remy)
+  artifacts:
+    - docs/sprint-2/drift-check.md（§7/§8 结论层改正 + 新增 §9 登记「>20% 规则触发未处置」+ R-5 窗口口径；**逐字工具输出块未改一字**）
+    - docs/sprint-2/progress.md（F-1 三处传播改正 / F-7 两处记账 / C4 回填 / frontmatter finalize / 本 Trace Log）
+    - docs/sprint-2/done.md（新增，Schema 对齐 docs/sprint-1/done.md）
+    - docs/sprint-2/hill-climbing.md（新增）
+    - .kixpower/memory/repo/{lessons-learned,harness-backlog}.md
+    - PROJECT_BRIEF.md（§8 / §11）
+    - README.md、README.en.md、dsh/README-DSH.md、dsh/preset-classic/DSH-ADAPTATION.md（**F-2 五处调用点**）
+  scope_expansion: >-
+    **C5 范围扩张（由 orchestrator 依据 QA F-2 授权）**：上述 4 个文档的 **5 处** pwsh-only 维护调用点
+    （`dsh/README-DSH.md:31`/`:41`、`README.md:72`、`README.en.md:72`、`dsh/preset-classic/DSH-ADAPTATION.md:306`）
+    **不在 plan 原申报的 C5 范围内**（plan §C5 = done/hill-climbing/qa-signoff/L2 字段）。**docs-only，不影响 `42d3c7e` 的 L2/QA 签署绑定**。
+  mg2_gap: >-
+    **MG2 检索面收窄问题（F-2 附带）**：MG2 只覆盖 `agents/` 目录（`grep -rn "^hooks:\|\.ps1" dsh/preset-classic/agents en/preset-classic-en/agents`），
+    故 `README*.md` / `dsh/README-DSH.md` / `DSH-ADAPTATION.md` 的 pwsh-only 指令**从来不在任何 gate 的检索面内** —— 这正是 F-2 能存活到 QA 期的机制原因。
+    修复方向（登记 Sprint 3，见 HB-8）：把「维护调用点」纳入机械检索面（如 `sync-dsh-preset\.ps1` 的 docs 全局 0 命中判据）。
+    本层只改 5 处；**残留**：`dsh/README-DSH.md:57-59`（日常同步三例）、`dsh/preset-classic/PLUGINIZATION-ROADMAP.md:172`、
+    `scripts/context-budget/README.md:74`、`docs/kix-general-evolution.md:333`、`CHANGELOG.md` 历史条目（**历史条目按红线不改写**）→ 见 `done.md` §5 R-7。
+  docs_only_proof: >-
+    **C5 变更面经机械核对为 docs-only**：`git diff --name-only 42d3c7e..HEAD` + `git status --porcelain` 中
+    不含 `skills/`、`scripts/`、`agents/`、`en/`、`install.*`、`package.json`、`.github/`；
+    `dsh/` 面仅 `dsh/README-DSH.md` 与 `dsh/preset-classic/DSH-ADAPTATION.md` 两个 `.md`。
+    ⇒ `42d3c7e` 的 L2 记录（manifest 5f4eab16…）与 QA 签署（`qa_verified_sha` / `qa_gate_manifest_sha256`）**不失效**。
+    提交后 `npm run test:consistency` 与 `npm run test:installer` 复跑仍绿（见 `finalize`）。
+  l2_manifest: null
+- at: 2026-09-22
+  stage: finalize
+  stage_signal: Sprint 2 结算（状态机 `in_progress → done`；`release_eligible: false`）
+  actor: kixpower-producer (Remy)
+  gates:
+    - "`status: done`；`completed_tasks: 9` / `total_tasks: 9` / `blocked_tasks: 0`"
+    - "`final_head: 42d3c7efdd1dfcdf8aba4ba933713547d83e5247`（签署冻结 evidence revision）；`qa_status: CONDITIONAL`"
+    - "`commits_used: 5`（C1 affc9c7 / C2 1479a35 / C3 27fe7f6 / C4 42d3c7e / C5 = 本层）；`derived_commit_budget: 6` → **`over_budget: 0`**"
+    - "`ci_pending: true`；CG1/CG2/CG3/CG4/CG5 全 pending（R4 open，未授权 push/PR）"
+  note: >-
+    **档位**：`done` + `release_eligible: false` + `ci_pending: true`（沿用 Sprint 1 的裁决口径，见 `done.md` §8）。
+    QA 的 `CONDITIONAL` 判定与 §12「本 Sprint 不因本报告获得发布许可」在 `done.md` 中**逐字保留**。
+    Sprint 3 入口：F-3/F-4/F-5/F-6 登记项 + H-set-B 6 个 hook（N9）+ `>20%` 规则的**可判定窗口复核**（drift-check §9）+ HB-8..HB-11。
+  l2_manifest: null
 ## 阻塞与风险（实时）
 
 | # | 项 | 级别 | 当前处置 |
@@ -441,5 +582,8 @@ blast_radius:
 | **D-2（本次新增）** | hook 输入契约失真（旧 `tool_name` schema vs 真实 `toolCalls[]`） | 中高 | 修复面 = T6（payload 归一化 + LG15 双 schema 用例）；取证 = OQ9 |
 | **OQ8（本次新增）** | Copilot 对 hook **spawn 失败**是 `deny` 还是 `ignore`（未取证） | 中高（若为 deny → 无 pwsh 宿主上未移植的 6 条 `pwsh` 声明会阻塞全部工具调用） | 需真实 Copilot 会话取证；**falsifier 已预置**：若 deny → 立即移植或移除未移植声明（plan §13.0 末段） |
 | **OQ13（本次新增）** | `warn_threshold = δ*3 + bug_reserve = 10 == hard_cap` → 预警通道结构性不可达（与 Sprint 1 OQ9 同型） | 中（失去早期预警） | 本 Sprint 以「≤6 环境硬约束」代替预警：跨过 5 个 commit 即人工记预警；公式修订留 N6 |
+| **F-1（P2，C5 已修）** | `drift-check.md` §8 结论行与自身逐字输出矛盾 + `progress.md` 3 处传播「`ungated: 0 (0%)` → PASS」 | 中（结论无证据支撑；**不阻塞 gate**：LG11 exit 0 已复现） | **C5 已改实际读数**（§8 块 `15 (23.4%)`；QA @`42d3c7e` = `22 (27.8%)`）+ 新增 `drift-check.md` §9 登记「>20% 规则**触发且未处置**」+ R-5 窗口口径；逐字块未改 |
+| **F-2（P2，C5 已修 5/8）** | 4 个文档 5 处 pwsh-only 维护调用点（无 pwsh 宿主上维护路径结构性不可执行） | 中（与 plan 论证 T2/T3 必要性的缺陷同类） | **C5 已改 5 处**（授权范围）；**残留**：`dsh/README-DSH.md:57-59` + 3 处历史/约定文档 + `CHANGELOG.md` 历史条目（红线不改）→ 见 `done.md` R-7 / HB-8 |
+| **`>20%` 强制规则（未处置）** | verification-fidelity 报 `HIGH_RISK`（23.4% / 27.8% > 20%）⇒ 按 `kixpower-producer.agent.md` §核心职责 6 应**强制扩展** `target_rules` | 中高（规则被触发而无处置 = 门禁缺口） | 如实登记为「**触发且未按规则处置**」；Sprint 2 的目标集是「覆盖优先」的事后巧合，**不是合规**；**结转 Sprint 3**（以 `--prev-sprint 2` 可判定窗口复核）→ `drift-check.md` §9 / `hill-climbing.md` §4 |
 
 > **预算预警登记位**：`commit_budget_warning`（跨过 5 个 commit 时由 orchestrator 写入；`over_budget` 于收尾写入，**禁止事后回改 plan §15**）。

@@ -11,7 +11,7 @@
 ```yaml
 - id: HB-1
   type: dev-workflow
-  status: candidate
+  status: validated
   problem: >-
     依赖外部可执行文件（pwsh/node/psql 等）的测试用例，其 skip 判据按用例各自为政：
     scripts/sync-dsh-preset.test.js 同文件 5 条 pwsh 依赖用例中，2 条用能力探针
@@ -27,6 +27,9 @@
     - task: "Sprint 1"
       kind: origin
       result: observed
+    - task: "Sprint 2"
+      kind: trial
+      result: pass
   archive_reason: null
   eval:
     task_kinds: [sprint, review]
@@ -47,6 +50,14 @@
   note: >-
     本项 origin 即 Sprint 1（T1/T4 正是其对策）。同一 Sprint 不能同时充当自己的 trial
     （自我确证），故 applies_to_sprints 从 ">=2" 起，Sprint 1 不计 unmatched。
+    **Sprint 2 trial：pass → `validated`（2026-09-22 收尾，Producer）**。证据：`LG1 = 32/32/0/0`
+    （skip 5 → **0**：T4 把 5 条 pwsh 依赖用例改为 spawn `node` ⇒ **能力型 skip 结构性归零**）；
+    新增 `scripts/copilot-installer.test.js` 的 `bash` 用例走**平台前提绑定**的
+    `SKIP: windows-only — ` 通道（文案机器可识别，`qa-signoff-2.md` MG1/MG8 实读）。
+    **判据修订（登记）**：原 `pass_criteria` 的「无 pwsh = 5 skip」预期项被 T4 消除（不再有 pwsh 依赖用例）；
+    对 `node`（测试运行器自身）`/bash`（平台前提）做能力探针属**空操作**，故判据改为：
+    「凡能力型依赖必须有探针；平台型 skip 必须绑平台前提且文案可识别；skip 计数必须能被语义解释」。
+    **残余**：win32 的 skip 分支本地不可观测 → 归 CI（`done.md` §5 R-1/R-3）。
 
 - id: HB-2
   type: plan-template
@@ -85,7 +96,7 @@
 
 - id: HB-3
   type: plan-template
-  status: candidate
+  status: validated
   problem: >-
     链式 canonical 入口的**覆盖遮蔽**：package.json#scripts.test = "A && B && C && D && E"。
     Sprint 1 基线 A 红 ⇒ B–E 四段从未执行，报告只能看到 4 条失败；A 修好后立刻暴露
@@ -100,6 +111,9 @@
     - task: "Sprint 1"
       kind: origin
       result: observed
+    - task: "Sprint 2"
+      kind: trial
+      result: pass
   archive_reason: null
   eval:
     task_kinds: [sprint]
@@ -116,11 +130,11 @@
     supersedes: []
     unmatched_runs: 0
     archive_after_unmatched: null
-  note: "与 HB-2 的区别：HB-2 管「基线的表述与计数纪律」（人如何写），HB-3 管「gate 的结构」（机器如何观测）。两者可同时命中。"
+  note: "与 HB-2 的区别：HB-2 管「基线的表述与计数纪律」（人如何写），HB-3 管「gate 的结构」（机器如何观测）。两者可同时命中。**Sprint 2 trial：pass → `validated`（2026-09-22）**：plan §7.1 为 zh 链每段（LG3/LG4/LG5）与 en 链链尾（LG7）建独立 required gate，`npm test` / `cd en && npm test` 仅作附加判据；L2 逐段给出终态（`23/0/1` · `20/20` · `59/0/1` · `35/0/1`），QA 独立复跑抽取段计数一致。Sprint 3 起作为既定实践应用并监测 regression。"
 
 - id: HB-4
   type: qa-workflow
-  status: candidate
+  status: validated
   problem: >-
     测试的非 hermetic 性：install-lib.test.js 的幂等断言以**未入库的工作树 mtime**为输入。
     fresh checkout（仓库外 worktree @ c3c31eb）中落在失败带的文件数为 0 → baseline 在该
@@ -138,6 +152,9 @@
     - task: "Sprint 1"
       kind: counterexample
       result: fail
+    - task: "Sprint 2"
+      kind: trial
+      result: pass
   archive_reason: null
   eval:
     task_kinds: [sprint, review]
@@ -154,10 +171,16 @@
     supersedes: []
     unmatched_runs: 0
     archive_after_unmatched: null
+  note: >-
+    **Sprint 2 trial：pass → `validated`（2026-09-22）**。证据：本 Sprint 新增断言**一律显式构造状态**——
+    LG15 的 mutation probe（`KIX_HOOK_CORE_PATH` 指向改坏 core 的副本 ⇒ 子套件 16 个 `not ok`、进程非 0）
+    与 LG16 的哨兵注入 + 临时 `COPILOT_HOME`（QA 12 行注入表，含归因/作用域/分支可达性/PATH 收窄 4 组控制组 ⇒
+    判据非恒真、可归因、有作用域）；`progress.md` 记录 mutation probe 首版**假绿**（子进程继承父环境 ⇒ 孙进程 0 退出）
+    并已修正 —— 该假绿正属本项要防的形态。判据 (b) 的前置（复核 baseline 声称需第二个 checkout）本 Sprint 未出现。
 
 - id: HB-5
   type: tooling
-  status: candidate
+  status: validated
   problem: >-
     L2 信任链的核心凭据 l2_gate_manifest_sha256 在本机**无法复算**：canonical 实现
     （kixpower-contract.ps1 的 Get-KixGateManifestJson）依赖 pwsh，而交付宿主可以没有 pwsh。
@@ -172,6 +195,9 @@
     - task: "Sprint 1"
       kind: origin
       result: observed
+    - task: "Sprint 2"
+      kind: trial
+      result: pass
   archive_reason: null
   eval:
     task_kinds: [sprint, review]
@@ -186,6 +212,12 @@
     supersedes: []
     unmatched_runs: 0
     archive_after_unmatched: null
+  note: >-
+    **Sprint 2 trial：pass → `validated`（2026-09-22）**。证据：`plan.md` §7.2 写明 manifest 规范化规则
+    （field_set / 顺序 / compact JSON / `sha256(utf8)`），并由 **canonical 实现**（`kixpower-contract.cjs`）
+    产出；**QA 在无 pwsh 宿主上本地复算 `5f4eab16a3664356bed5317dd1de77a2c67487fce132e0f3475256abb15e2976`
+    逐位一致**（`qa-signoff-2.md` §1 第 6 行）⇒ Sprint 1 的「不可复算凭据」问题在本 Sprint 闭合。
+    关联教训：**LL-12**（凭据必须由 canonical 实现产出；临时脚本会静默偏离参照语义 —— Sprint 1 的 `46121655…` 即临时脚本 `fold + 不剥引号` 的产物，非 canonical 输出）。
 
 - id: HB-6
   type: plan-template
@@ -204,6 +236,9 @@
     - task: "Sprint 1"
       kind: origin
       result: observed
+    - task: "Sprint 2"
+      kind: trial
+      result: pending
   archive_reason: null
   eval:
     task_kinds: [sprint]
@@ -218,6 +253,13 @@
     supersedes: []
     unmatched_runs: 0
     archive_after_unmatched: null
+  note: >-
+    **Sprint 2 trial：`pending`（无效试验，不验证也不证伪）→ 保持 `candidate`（2026-09-22）**。
+    改进**确已应用**：`plan.md` §15 显式 `closeout_layer: 1`；结果也满足 `pass_criteria`
+    （`git rev-list --count ef6a485..HEAD` = 5 ≤ 6，且未回改预算）。**但绑定值 6 = min(公式 9, 环境硬约束 6)**
+    ⇒ **反事实不可区分**（即使不计 closeout_layer，`min(8,6)` 仍是 6）⇒ 本次结果不具判别力。
+    并列核算：`docs/sprint-2/done.md` §6 记录 `commits_used: 5 / derived_commit_budget: 6 / over_budget: 0`。
+    **下次判别条件**：出现预算**未被环境硬约束绑定**的 Sprint；若其 `over_budget` 仍 == 收尾提交数 ⇒ 改进无效，须修正或归档。
 
 - id: HB-7
   type: tooling
@@ -272,6 +314,245 @@
   note: >-
     本项 origin 即 Sprint 2（T7 正是其对策：INV-H1 残留 fail-closed、INV-H3 空作用域 skip、
     LG16 双向用例、MG8 grep 面），同一 Sprint 不能自证 → applies_to_sprints 从 ">=3" 起，Sprint 2 不计 unmatched。
+
+- id: HB-8
+  type: tooling
+  status: candidate
+  problem: >-
+    **维护调用点不在任何 gate 的检索面内**：MG2 只覆盖 `agents/` 目录
+    （`grep -rn "^hooks:\|\.ps1" dsh/preset-classic/agents en/preset-classic-en/agents`），
+    故 `README.md` / `README.en.md` / `dsh/README-DSH.md` / `dsh/preset-classic/DSH-ADAPTATION.md` 的
+    pwsh-only 维护指令**从来不会被任何 gate 命中**。Sprint 2 的 T4 把 `sync-dsh-preset` 移植为 `.cjs`，
+    但 5 处文档入口仍指示 `pwsh -File scripts/sync-dsh-preset.ps1 -Force`，且 `sync-dsh-preset.cjs`
+    在文档中 **0 命中** ⇒ 在无 pwsh 宿主（本 Sprint 的目标宿主）上，文档给出的维护路径**结构性不可执行**；
+    该缺陷由 QA 发现（F-2），而非任何门禁。
+  improvement: >-
+    （a）凡「移植/替换某个 canonical 入口」的任务，必须把该入口的**全部 live 消费者**（脚本 + 文档 + 配置）
+    列入 `target_rules` 与 gate 判据，而不是只改代码调用点；
+    （b）新增机械判据：**非历史文档**中旧入口的**维护指令**命中数 = 0
+    （历史类文档如 `CHANGELOG.md` 的既成条目按红线不改写，须以「历史/参照」标注排除）；
+    （c）MG 类的检索面必须显式声明「覆盖哪些目录/文件类型」，未覆盖面在 plan 中标注为已知缺口。
+  source: >-
+    Sprint 2 QA F-2（`qa-signoff-2.md` §9）：`dsh/README-DSH.md:31,41`、`README.md:72`、`README.en.md:72`、
+    `dsh/preset-classic/DSH-ADAPTATION.md:306`；`grep -rn 'sync-dsh-preset\.cjs' --include='*.md'`（除 docs/sprint-*）= 0 命中。
+  evidence:
+    - task: "Sprint 2"
+      kind: origin
+      result: observed
+  archive_reason: null
+  eval:
+    task_kinds: [sprint, review]
+    trigger: "diff 中出现「某 canonical 入口被移植/替换/改语言」，或新增/修改文档中的维护命令"
+    pass_criteria: >-
+      ① 旧入口在**非历史文档**中的维护指令命中数 = 0（历史条目须显式标注为历史）；
+      ② 新入口至少在一个「首次安装/日常维护」语义的位置出现（不是只在 CHANGELOG 里）；
+      ③ 声称「已收口」的 gate 必须给出其检索面清单（目录 + 文件类型），且检索面覆盖该次移植的全部 live 消费者。
+    regression_signal: >-
+      出现「代码已迁移但文档仍指向旧入口」或「无 pwsh 宿主上按文档无法完成维护」的用户可见缺口；
+      或某 gate 自称覆盖某面而实测检索面为空/不匹配。
+    applies_to_sprints: ">=3"
+    check_timing: "both"
+    overlaps_with: [HB-7]
+    supersedes: []
+    unmatched_runs: 0
+    archive_after_unmatched: null
+  note: >-
+    本项 origin 即 Sprint 2（F-2）；Sprint 2 的 C5 只按授权修了 5 处，**残留 4 个文件**（`dsh/README-DSH.md:57-59`、
+    `PLUGINIZATION-ROADMAP.md:172`、`context-budget/README.md:74`、`kix-general-evolution.md:333`）→ 见 `done.md` R-7 / `hill-climbing.md` §8 U7。
+
+- id: HB-9
+  type: plan-template
+  status: candidate
+  problem: >-
+    **报告/台账中的「结论行」与「它自己那一次运行的逐字输出」脱钩，且错误读数会多点传播**：
+    `drift-check.md` §8 的逐字输出块写 `ungated: 15 (23.4%)` + `HIGH_RISK`（无 `PASS` 行），
+    而同节结论行写「本轮读数：`ungated: 0 (0%)` → `PASS`」——那是同文件 §7 **另一次运行**的读数；
+    同一「0%/PASS」又传播到 `progress.md` 3 处（`:55`/`:112`/`:266`，其中 `:55` 的 `46/17/29` 与两块均不一致）。
+    净效果：**没有任何 gate 失败**（LG11 的 exit 0 仍成立），但结论无证据支撑，且据此写下
+    「`>20%` 强制规则未被触发」这一**反事实结论**（实际 23.4% / 27.8% > 20%，规则**被触发**）。
+  improvement: >-
+    （a）任何指标读数必须与该次运行的**逐字输出块**同处一文件、可机械对拍；跨运行引用必须显式标注
+    「引自 <revision/时间> 的运行」并同时给出本次运行读数；
+    （b）度量命令的**窗口参数**（如 `--prev-sprint N` ⇒ baseline）必须随读数声明为四元组
+    （cmd / window / baseline_sha / revision），窗口跨 Sprint 时禁止表述为「本 Sprint 的 X」；
+    （c）阈值型强制规则（如 >20%）的触发判定**只认同一次运行的读数**；
+    （d）Producer 收尾前必须对每个度量值做一次「grep 回它的输出块」自查（可机械化的最小检查）。
+  source: >-
+    Sprint 2 QA F-1（`qa-signoff-2.md` §9）：`sed -n '214p;185p;208p' docs/sprint-2/drift-check.md`；
+    `grep -n 'ungated: 0 (0%)' docs/sprint-2/progress.md` = 3 处；QA 在 `42d3c7e` 复跑 = `79 / 18 / 39 / 22 (27.8%)`。
+  evidence:
+    - task: "Sprint 2"
+      kind: origin
+      result: observed
+  archive_reason: null
+  eval:
+    task_kinds: [sprint, review]
+    trigger: "报告 / 台账 / signoff 中出现任一量化指标读数（覆盖率、计数、比率、digest、退出码）"
+    pass_criteria: >-
+      ① 每个读数都能 `grep` 回它所属的运行输出块（或显式标注为跨运行引用 + 两次运行标识）；
+      ② 度量类读数附窗口四元组；③ 阈值型规则给出「同一次运行读数 → 触发/未触发」的判定句；
+      ④ 同一读数的多处出现逐值一致（不一致即视为缺陷）。
+    regression_signal: >-
+      同一指标在不同文件/不同段落出现不同值；或结论行引用的读数在同节找不到输出块；
+      或以某次运行的读数代表另一次运行的窗口。
+    applies_to_sprints: ">=3"
+    check_timing: "both"
+    overlaps_with: [HB-2, HB-13]
+    supersedes: []
+    unmatched_runs: 0
+    archive_after_unmatched: null
+  note: "本项 origin 即 Sprint 2（F-1）；配套经验 LL-10（结论与自身证据同源）与 LL-11（指标窗口四元组）。"
+
+- id: HB-10
+  type: dev-workflow
+  status: candidate
+  problem: >-
+    **installer 残留扫描的作用域与「本 bundle 写入的文件」不对齐 + 失败非原子**：
+    `install.sh:290` = `grep -rl '{{' "$COPILOT_HOME/agents"`（**该目录下全部文件**），
+    而 `install.ps1:280` = `Get-ChildItem … -Filter '*.agent.md'`（仅 agent 清单）⇒ 两个 installer 作用域不对称；
+    实测：目标目录**预先存在**的第三方文件 `other-tool.agent.md` 含 `{{MY_TEMPLATE}}` → 安装器 exit 1 并指名
+    一个与本 bundle 无关的文件（误报）；且失败发生在**拷贝之后**（`partial_tree_left=true`）。
+  improvement: >-
+    残留扫描必须以「本次 installer 实际写入/替换过的文件清单」为作用域（或按 bundle 已知文件名白名单收窄，
+    而非按目录全扫）；失败路径必须为**原子或可恢复**：失败时不留下半装树（先写临时目录再整体切换），
+    或至少在非零退出时输出**待清理路径清单 + 重跑提示**（幂等已由 LG16 实测）。
+  source: "Sprint 2 QA F-3（`qa-signoff-2.md` §9）：探针 `lg16-edges.cjs` C1/C2/C3；`grep -n \"grep -rl '{{'\" install.sh`；`grep -n \"Filter '\\*.agent.md'\" install.ps1`"
+  evidence:
+    - task: "Sprint 2"
+      kind: origin
+      result: observed
+  archive_reason: null
+  eval:
+    task_kinds: [sprint, review]
+    trigger: "diff 中出现 installer / 迁移脚本的「扫描 / 校验 / 清理」步骤，或其 fail-closed 分支"
+    pass_criteria: >-
+      ① 扫描作用域 == 本 bundle 写入的文件集合（第三方既有文件不得触发失败）；
+      ② 两个平台的 installer 作用域**对称**（同一语义、同一集合定义）；
+      ③ 失败路径要么原子（无半装树），要么输出可执行的清理/重跑指引并已在文档中给出。
+    regression_signal: >-
+      出现「第三方文件导致安装失败」或「失败后目标目录处于半装状态且无指引」的报告；
+      或两个 installer 的扫描范围定义再次分叉。
+    applies_to_sprints: ">=3"
+    check_timing: "both"
+    overlaps_with: [HB-7]
+    supersedes: []
+    unmatched_runs: 0
+    archive_after_unmatched: null
+  note: "本项 origin 即 Sprint 2（F-3）；方向安全（fail-closed、指名文件、可恢复），故 F-3 定级 P3。"
+
+- id: HB-11
+  type: dev-workflow
+  status: candidate
+  problem: >-
+    **fail-closed 的「未知形态」判据按输入契约枚举不完整 ⇒ 理论敞口**：
+    `kix-verdict.cjs:71` 的 `TOOL_LIKE_KEY = /tool|call|command|input|args|invocation|payload|name/i` 中
+    **`arguments` / `parameters` / `function` 均不在表内**（`args` 匹配不到 `arguments`）。
+    实测 `{"chat":{"function":"bash","arguments":{"command":"psql -c \"DROP TABLE t\""}}}` → exit 0（**静默放行**）；
+    混合形态 `{"toolCalls":[], …形态3 危险调用}` 亦 exit 0（`toolCalls` 存在即短路）。
+    反向风险同样存在：`.ps1` 侧 `if ($toolCalls)` 对**空数组**按 PowerShell 真值语义会落入形态 3（需 pwsh/CG4 定档）。
+  improvement: >-
+    （a）「未知形态」判据必须按**输入契约枚举完整键名**（含 `arguments`/`parameters`/`function`），
+    并保留「只有元数据字段 ⇒ 非 unknown」的**反向控制**；
+    （b）空 `toolCalls` 不得短路后续形态识别（空数组 ≠ 无危险调用）；
+    （c）本项的任何实现改动**必须以真实宿主载荷采样作为 falsifier**（OQ9），否则属无证据加严。
+  source: "Sprint 2 QA F-4（`qa-signoff-2.md` §9）：`hook-probe.cjs` B1/B2/B3（4 个入口同源核心）"
+  evidence:
+    - task: "Sprint 2"
+      kind: origin
+      result: observed
+  archive_reason: null
+  eval:
+    task_kinds: [sprint, review]
+    trigger: "diff 中出现「外部输入载荷归一化 / schema 适配 / fail-closed 判据」的新增或修改"
+    pass_criteria: >-
+      ① 未知形态判据的键名集合覆盖契约中出现的全部工具调用载体（含 arguments/parameters/function）；
+      ② 存在反向控制（纯元数据载荷必须放行）与短路测试（空 toolCalls + 危险形态）；
+      ③ 加严有外部证据（真实载荷采样）或显式标注为「无外部证据的防御性加严」。
+    regression_signal: >-
+      出现「构造的未知形态载荷被静默放行」的探针结果；或加严导致真实载荷被误判为 unknown（假阳性）。
+    applies_to_sprints: ">=3"
+    check_timing: "both"
+    overlaps_with: [HB-7]
+    supersedes: []
+    unmatched_runs: 0
+    archive_after_unmatched: null
+  note: >-
+    本项 origin 即 Sprint 2（F-4）。**Sprint 2 明确不做**其 1 行改进：属产品码改动
+    （`skills/kixpower/hooks/lib/kix-verdict.cjs` ×3 副本）→ 会使 QA 签署（绑定 `42d3c7e` + `qa_test_changes: []`）
+    **立即失效**，故只登记。配套经验 LL-13（按轴分解验证）。"
+
+- id: HB-12
+  type: tooling
+  status: candidate
+  problem: >-
+    **新增的文档类三面产物不在任何机器守护的 identical-set 内**：
+    `skills/kixpower/hooks/README.md`（3 副本，MG10 的**证据对象**本身）未登记进 `consistency-lib.cjs` 的镜像组
+    （`grep -n 'README.md' dsh/preset-classic/plugins/consistency-lib.cjs` = 0 命中）；
+    `checkMarkdownLinks` 只校验链接可达性、不比较三面内容（且 `walk()` 不跟随 `dsh/preset/skills` symlink）。
+    当前 3 副本 md5 一致（`ea8ce56f…`）→ **今天一致，将来漂移静默**。
+  improvement: >-
+    凡新增「多副本分发的文档/配置」产物，必须同时登记进一致性守护组（`SPRINT2_NODE_ARTIFACTS` 或新建
+    「文档类三面组」），或在该产物上显式声明「不受守护」并给出替代守护方式；
+    MG 类判据若以某文件为证据对象，则该对象自身应在守护面内（防「证据对象漂移导致判据失真」）。
+  source: "Sprint 2 QA F-5（`qa-signoff-2.md` §9）：`md5 -q skills/kixpower/hooks/README.md dsh/preset-classic/… en/…`；`grep -n README.md dsh/preset-classic/plugins/consistency-lib.cjs` = 0"
+  evidence:
+    - task: "Sprint 2"
+      kind: origin
+      result: observed
+  archive_reason: null
+  eval:
+    task_kinds: [sprint, review]
+    trigger: "diff 中出现新的多副本产物（同内容存在于 ≥2 个发行面）"
+    pass_criteria: >-
+      ① 新多副本产物在同一 Sprint 内被加入某个机器守护组（字节或结构级），或在报告中显式声明不受守护；
+      ② 以某文件为证据对象的 gate，其证据对象位于守护面内（或有替代守护）。
+    regression_signal: "出现「三面内容不一致但无任何门禁报警」的漂移实例；或证据对象被静默修改而判据未失效。"
+    applies_to_sprints: ">=3"
+    check_timing: "both"
+    overlaps_with: [HB-5]
+    supersedes: []
+    unmatched_runs: 0
+    archive_after_unmatched: null
+  note: "本项 origin 即 Sprint 2（F-5）。`consistency-lib.cjs` 属产品码 ⇒ Sprint 2 不改（会使 QA 签署失效）。"
+
+- id: HB-13
+  type: qa-workflow
+  status: candidate
+  problem: >-
+    **门禁判据的强度弱于其自述**（两处）：① `KIX-INSTALLER-NO-NODE` 出现在 `install.sh`
+    **成功路径的横幅**（`Node required: >= 20.16.0 (KIX-INSTALLER-NO-NODE otherwise)`）⇒ QA 的 T7 实测中
+    **被接受的版本也被 grep 命中**（`marker=true` 而 exit 0）⇒「输出含 marker」**不构成失败证据**；
+    ② `copilot-installer.test.js:208` 的 `assert.match(text, /skip: /)` 对 `install.ps1` 命中的是**占位符替换**
+    的 skip 文案（`install.ps1` 无 chmod 步骤：`grep -c chmod install.ps1` = 0）⇒ 该断言对 ps1 侧**不判别**
+    其注释所声称的空作用域语义（sh 侧由 `:173` 的精确文案断言覆盖，是真判据）。
+  improvement: >-
+    （a）**失败判据必须以退出码为主证据**，文本 marker 只能在「该文本不出现在成功路径」时作为辅助
+    （否则须改用**只出现在失败分支**的独占文本，并在注释中写明该约束）；
+    （b）跨平台断言的注释必须声明其**适用侧**（sh-only / ps1-only），不得让读者以为两侧都被判别；
+    （c）每条断言需能回答「它失败时是否真的说明目标语义被破坏」。
+  source: "Sprint 2 QA F-6（`qa-signoff-2.md` §9）：`grep -n 'KIX-INSTALLER-NO-NODE' install.sh`；`lg16-inject.cjs` T7 输出；`sed -n '202,215p' scripts/copilot-installer.test.js`"
+  evidence:
+    - task: "Sprint 2"
+      kind: origin
+      result: observed
+  archive_reason: null
+  eval:
+    task_kinds: [review, sprint]
+    trigger: "新增/修改测试断言，或新增机器可识别错误 marker / 失败文案"
+    pass_criteria: >-
+      ① 每条新断言都能指出「失败 ⇒ 哪条语义被破坏」，且其证据不被成功路径复用（无 `marker=true 且 exit 0` 的两义态）；
+      ② 跨平台断言的适用范围在注释或测试名中显式声明；
+      ③ 存在至少一条控制用例证明该断言非恒真（或给出判据自证的机械方式）。
+    regression_signal: >-
+      「断言通过但目标语义未生效」或「断言失败但实际正常」的实例（假绿/假红）；
+      或同一 marker 同时出现在成功与失败路径。
+    applies_to_sprints: ">=3"
+    check_timing: "both"
+    overlaps_with: [HB-9, HB-4]
+    supersedes: []
+    unmatched_runs: 0
+    archive_after_unmatched: null
+  note: "本项 origin 即 Sprint 2（F-6）。当前 LG16 **无假绿**（sh 侧为精确文案断言 + exit code 双证），故只登记不改。"
 ```
 
 ## 应用记录
@@ -284,11 +565,20 @@
 | 2 | HB-1 / HB-3 / HB-4 / HB-5 / HB-6 | 规划期首次独立匹配（`applies_to_sprints: ">=2"`）→ **5 项 scoped trial**（落实位置见 `docs/sprint-2/plan.md` §11 / §19）| trial 进行中，**待 QA 判定**（`not triggered` ≠ pass；trial pass ≠ 晋升 validated）|
 | 2 | HB-2 | 规划期基线为绿（`test:installer` exit 0、`test:consistency` exit 0）→ trigger 不匹配 | not triggered（**不得记为 pass**）|
 | 2 | HB-7 | 增量重规划期新增（candidate）：origin = installer 占位符契约空洞 + 无条件成功播报（D-1）| not triggered（origin == Sprint 2，自我确证无效；`applies_to_sprints: ">=3"`）|
+| **2** | **HB-1 / HB-3 / HB-4 / HB-5** | **收尾期 trial 判定（Producer @ `42d3c7e`，证据见各项 `note`）** | **`trial pass` → 晋升 `validated`**（4 项；自 Sprint 3 起作为 repo 级既定实践应用，并监测 `regression_signal`，命中即降回 `candidate`）|
+| **2** | **HB-6** | **收尾期 trial 判定：改进已应用但结果无判别力**（绑定值 6 = `min(公式 9, 环境硬约束 6)` ⇒ 反事实不可区分）| **`trial: pending`（无效试验）→ 保持 `candidate`**；下次判别条件见该项 `note` |
+| **2** | **HB-8 / HB-9 / HB-10 / HB-11 / HB-12 / HB-13** | **L4 收尾期新增（均 candidate）**：origin 分别 = F-2（维护调用点不在检索面）/ F-1（结论与自身证据矛盾并传播）/ F-3（installer 作用域+非原子）/ F-4（未知形态敞口）/ F-5（文档类三面未守护）/ F-6（判据强度弱于自述）| `not triggered`（origin == Sprint 2，自我确证无效；均 `applies_to_sprints: ">=3"`）|
 
 ## 统计
 
 ```yaml
-items_total: 7
-by_status: {candidate: 7, validated: 0, archived: 0}
-by_type: {dev-workflow: 1, plan-template: 3, qa-workflow: 1, tooling: 2}
+items_total: 13
+by_status: {candidate: 9, validated: 4, archived: 0}
+by_type: {dev-workflow: 3, plan-template: 4, qa-workflow: 2, tooling: 4}
 ```
+
+> **统计口径（Sprint 2 收尾，2026-09-22）**：`candidate: 9` = HB-2（trigger 未匹配）· HB-6（无效试验）·
+> HB-7（origin == Sprint 2）· HB-8..HB-13（L4 新增，origin == Sprint 2）。
+> `validated: 4` = HB-1 / HB-3 / HB-4 / HB-5（trial pass）。**无 `archived`**（无证伪、无被取代项）。
+> 硬约束遵守：L4 **未**直接写 `validated`（4 项均以「独立匹配窗口 + pass_criteria 可观测证据」晋升，
+> 且各自 `note` 记录了判据修订 / 残余）；`applied` 未写入任何 `- id:` 记录。

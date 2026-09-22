@@ -28,7 +28,7 @@ kix-bundle/
 ## 唯一事实源声明（2026-08-15 归一）
 
 - **`dsh/preset/` 是 DSH preset 的唯一事实源**。`~/.dsh/.agent-presets/kixparadigm/`
-  只是它的安装副本；两处内容由 `scripts/sync-dsh-preset.ps1` 单向同步。
+  只是它的安装副本；两处内容由 `node scripts/sync-dsh-preset.cjs` 单向同步。
 - 维护 preset = **改 `dsh/preset/` 里的文件**，然后跑同步脚本；不要在 `~/.dsh/` 里手改
   （改了也会被下次同步覆盖）。
 - 根目录的 `skills/`、`agents/`、`prompts/`、`memories/` 是 **Copilot 分发版**
@@ -36,9 +36,9 @@ kix-bundle/
 
 ## 首次安装 / 重装
 
-```powershell
+```console
 # 全新安装或整体重装（覆盖目标）：
-pwsh -File .\scripts\sync-dsh-preset.ps1 -Force
+node .\scripts\sync-dsh-preset.cjs -Force
 ```
 
 重装后需恢复的**预设外**改动（preset 装不进去，属 host/profile 层）：

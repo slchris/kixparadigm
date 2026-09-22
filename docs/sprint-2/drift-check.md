@@ -149,8 +149,8 @@ fidelity_v5:
 
 | 项 | 结果 | 口径说明 |
 |---|---|---|
-| `verification_fidelity` | **`0%` ungated（PASS）** | 解除 Sprint 1 的 `baseline_degraded`：该指标不再是「不可量化」 |
-| Sprint 1 的 `>20% → 强制扩展 target_rules` 规则 | 本机**可机械判定**了；实测 0% → 该强制**未被触发** | §4 的「覆盖优先」设为保守策略，事后被实测证明未过度收缩 |
+| `verification_fidelity` | 本 §7 单次运行读数 = `0%` ungated（`PASS`）。**该读数只属本 §7 的运行窗口**，已被同文件 §8 的后续运行取代（见下两行与 §9） | 解除 Sprint 1 的 `baseline_degraded`：该指标不再是「不可量化」 |
+| Sprint 1 的 `>20% → 强制扩展 target_rules` 规则 | **修订（C5 / F-1）：原结论「实测 0% → 该强制未被触发」作废。** 同一命令、同一窗口（`--prev-sprint 1` ⇒ baseline `c3c31eb`，覆盖 **Sprint 1 + Sprint 2** 改动集）的后续运行 = §8 逐字块 `ungated: 15 (23.4%)`；QA 在冻结 revision `42d3c7e` 的权威复跑 = `22 (27.8%)`。**两次均 > 20% 且均无 `PASS` 行 ⇒ 该强制被触发，且未按规则处置**（登记见 §9） | §4 的「覆盖优先」在**方向上**与该规则一致，但**不是因该规则而设定**（当时本机不可机械判定）→ 属**事后巧合，不构成合规**；该规则的正确处置**结转 Sprint 3** |
 | `unresolved_modules: github-workflows` | Sprint 1 计划里的模块名在仓库中不存在 | **计划侧遗留**，不是本工具缺陷；登记为 Sprint+1 候选（见 `progress.md`） |
 | `mechanical_links: 12 -> unresolved_offline: 12` | 12 条 `mechanical_links` 全部标 offline | 参照实现未实现在线解析（`unresolved_offline` 恒等于输入数）→ 移植**保持同语义**，不在此处「顺手改进」 |
 | 证据强度 | **E2（characterization）+ 真实运行**；**非 E1** | 与 `.ps1` 的逐字节差分仍待 LG10（`host_requires: [pwsh]` → 本机 `unavailable`） |
@@ -211,5 +211,62 @@ fidelity_v5:
   gated_off_tasks: 0
 ```
 
-**本轮读数与状态行**：`ungated: 0 (0%)` → `PASS`；`unresolved_modules: 1`（`github-workflows`，计划侧遗留）、
-`mechanical_links: 12 -> unresolved_offline: 12`（与参照实现同语义）。
+**本轮读数与状态行（C5 / F-1 修订层；上文逐字输出块未改一字）**：本 §8 自己那份输出的实际读数 =
+`total changed: 64` / `in_scope (rules): 17` / `whitelisted: 32` / **`ungated: 15 (23.4%)`** / `HIGH_RISK`，
+且 `fidelity_v5.ungated_ratio_pct = 23.4` —— **输出中不存在 `PASS` 行**。
+原文此处曾写「本轮读数：`ungated: 0 (0%)` → `PASS`」，与本 §8 自身逐字输出**直接矛盾**：那是 **§7 的运行读数**
+（`45 / 16 / 29 / 0 (0%)`，见 §7 逐字块），被误抄进 §8 的结论层，并进一步传播到 `progress.md` 三处
+（`:55` / `:112` / `:266`，其中 `:55` 的第三组读数 `46 / 17 / 29` 与 §7、§8 两块的逐字输出**均不一致**）。
+`unresolved_modules: 1`（`github-workflows`，计划侧遗留）、`mechanical_links: 12 -> unresolved_offline: 12`（与参照实现同语义）两项结论**不变**。
+
+**权威读数（QA 独立复跑 @ 冻结 revision `42d3c7e`）**：`79 / 18 / 39 / 22 (27.8%)`，**无 `PASS` 行**，两次运行逐字节相同（确定性）；
+与 QA 签署（`qa-signoff-2.md` §2 的 LG11 行、§9 F-1）一致。
+
+---
+
+## 9. C5 修订登记：`>20% → 强制扩展 target_rules` 规则**被触发且未按规则处置**（F-1；追加不改写 §4/§7/§8 的逐字输出块）
+
+> **本节性质**：对 §7 / §8 结论层的**追加式修订**（原文不删、逐字工具输出块不动）。触发者 = `qa-signoff-2.md` F-1（P2）。
+> 修订前的两处矛盾读数（§8 结论行 `:214` 与 `progress.md` 三处传播）已在上文与 `progress.md` 就地改为实际读数并标注。
+
+### 9.1 三次读数的完整台账（同一命令、同一窗口）
+
+```text
+命令（逐字）：node skills/kixpower/scripts/verification-fidelity-check.cjs --project-root . --prev-sprint 1
+
+读数 #1  §7 逐字块        total changed 45 / in_scope 16 / whitelisted 29 / ungated  0 (0%)   → PASS        （T3 交付时的工作树）
+读数 #2  §8 逐字块        total changed 64 / in_scope 17 / whitelisted 32 / ungated 15 (23.4%) → HIGH_RISK   （层 2 提交后）
+读数 #3  QA @ 42d3c7e     total changed 79 / in_scope 18 / whitelisted 39 / ungated 22 (27.8%) → HIGH_RISK   （冻结 revision；两次运行逐字节相同）
+读数 #4  Producer C5 复核  total changed 79 / in_scope 18 / whitelisted 39 / ungated 22 (27.8%) → HIGH_RISK   （C5 编辑前工作树；独立复现 #3）
+```
+
+> 读数 #4 = 本层在不采信 QA 计数前提下**独立跑同一命令**复现 #3 ⇒「27.8%」不是单点观测。
+> 读数 #1 与本层不矛盾（它是另一次运行），矛盾**只在结论层**：§8 的结论行抄了 #1 的数字。
+
+### 9.2 口径声明（R-5，**强制**）
+
+本工具 `--prev-sprint 1` 的窗口 = **Sprint 1 的 baseline `c3c31eb3268622358761cb2035ec84810a12ca11`**（取自 `progress.sprint_baseline_sha`），
+即：`total changed` 统计的是 **`c3c31eb` → 当前 HEAD 的全部改动**，**同时覆盖 Sprint 1 与 Sprint 2**（工具输出自证：`Sprint: 1`、`fidelity_v5.sprint: 1`、`baseline: c3c31eb…`）。
+因此：
+
+- **禁止**把本工具的任一读数表述为「**本 Sprint**（Sprint 2）的 fidelity」；
+- 若要判定「Sprint 2 自身」的未门禁比例，必须换用 Sprint 2 的 baseline（`ef6a485`）重跑 —— **本 Sprint 未做**（工具语义与 plan §7 的 `--prev-sprint 1` 判据均未定义该窗口）；
+- 任何引用本指标的结论（含 `done.md`）必须随行声明该窗口。
+
+### 9.3 规则处置（如实登记：**触发且未处置**）
+
+| 项 | 内容 |
+|---|---|
+| 规则原文 | `kixpower-producer.agent.md` §核心职责 6：若 verification-fidelity 报 high_risk（>20% 未门禁），**强制扩展**新 plan.md 的 `target_rules` 覆盖前一 Sprint 漏掉的范围 |
+| 判定 | **触发**：读数 #2 `23.4%`、#3/#4 `27.8%`，两者均 `HIGH_RISK`，均无 `PASS` 行（阈值 20%） |
+| 是否按规则处置 | **否 —— 未按规则处置**。Sprint 2 的 `target_rules` 是在**本机不可机械判定**该指标时、按 §4 的「**覆盖优先**」策略设定的（`plan.md` §3 / §4 显式列入：3 个 `.cjs` 的 3 副本组、4 副本 `consistency-lib.cjs`、12 个 agent 文件、4 处调用点文档、`TEAM_CONVENTIONS.md` 3 副本） |
+| 正确性质 | **事后巧合，不是合规**：目标集在**方向上**与该规则一致（覆盖了当时可识别的漏检面），但设定动机是「无法量化 → 保守取全覆盖」，**不是**「指标报 high_risk → 按规则扩展」这一因果链。把「结果看起来够全」当作「规则已被遵守」是**倒因为果** |
+| **不得**这样写 | ① 不得写「该强制**未被触发**」（§7 原结论，已作废）；② 不得写「已**合规**」；③ 不得用读数 #1 的 `0%` 代表本窗口 |
+| 结转 | **Sprint 3**：以**可判定窗口**（`--prev-sprint 2`，即 `ef6a485` → Sprint 2 终态）复核 —— 若仍 >20%，则**真正执行**「扩展 `target_rules` 覆盖 Sprint 2 漏检面」的机械动作，并把扩展结果写进 Sprint 3 的 plan；本层只登记，不代 Sprint 3 决策 |
+| 对 `done.md` 的约束 | `done.md` **不得**宣称「覆盖率 PASS」；只能记「LG11 exit 0（gate 字面判据成立）+ `ungated 27.8%`（窗口 = Sprint 1 + Sprint 2）→ 遗留规则待 Sprint 3 处置」 |
+
+### 9.4 影响面（F-1 的边界，与 QA 一致）
+
+- LG11 的**字面判据仍成立**：exit 0 + `[Verification Fidelity]`/`fidelity_v5:` 两段存在 + 非 `baseline_degraded` ⇒ **不构成 gate 失败**（13/13 required exit 0 的结论不受影响）。
+- 受影响的是**结论层**：任何据此声称「未门禁比例 0%」「覆盖率 PASS」的表述无证据支撑，已在本层就地修正。
+- 逐字工具输出块（§7 / §8 的 ```text 块）**未改一字**（工具输出不可改写）；修正只落在结论与解释层。
