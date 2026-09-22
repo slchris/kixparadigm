@@ -48,7 +48,7 @@ updated: 2026-09-22
 | 编排层 | kixpower v5.7（Markdown 角色定义 + 约定文档） | `agents/*.agent.md`、`skills/kixpower/**`、`prompts/*.prompt.md` |
 | 一致性守护 | `scripts/check-dsh-consistency.cjs` + `dsh/preset/plugins/consistency-lib.cjs` | 单一事实源：CI 与运行时插件共用同一检查库 |
 | 测试 | `node --test`（Node 内置 test runner），无测试框架依赖 | 单元/集成测试全部在仓库内 |
-| CI | GitHub Actions（`.github/workflows/ci.yml`） | `ubuntu-latest` + `windows-latest` × node `20.16.0`/`22.x` + `npm pack --dry-run` |
+| CI | GitHub Actions（`.github/workflows/ci.yml`） | `ubuntu-latest` + `windows-latest` + `macos-latest`（Sprint 1 T3 追加）× node `20.16.0`/`22.x` = **6 组合** + `npm pack --dry-run`；**CI 侧 success 未取证**（CG2 pending，见第 7 章 / R4）|
 
 **架构主轴（三层资产 + 一道守护）**：
 
@@ -129,13 +129,15 @@ en/preset-classic-en/ ──npm───▶ kixparadigm-classic-en
 | 宿主工具契约 | `restrict({deny:[...]})` 的 own-layer 名不在 `restrictableNames` → 抛错；四份 preset 全部 32 处 deny 名单已移除 `subagent` | `CHANGELOG.md` v1.3.16 |
 | **npm 双包** | 主包 `kixparadigm`（zh）/ `kixparadigm-en`（en）版本号同步（守护 `checkVersionPair`） | `package.json`、`en/package.json` |
 | npm `files` 白名单 | presets 资产的发行面（`bin/ scripts/ dsh/ skills/ agents/ instructions/ prompts/ memories/` 等） | `package.json#files` |
-| **CI** | `.github/workflows/ci.yml`：`test` job = `[ubuntu-latest, windows-latest] × [20.16.0, 22.x]`，每格跑 `npm test`（zh）+ `en/ npm test`；`pack` job = 两包 `npm pack --dry-run` | `.github/workflows/ci.yml` |
+| **CI** | `.github/workflows/ci.yml`：`test` job = `[ubuntu-latest, windows-latest, macos-latest] × [20.16.0, 22.x]`（**6 组合**；`macos-latest` 由 Sprint 1 T3 追加，`fail-fast: false` 保留），每格跑 `npm test`（zh）+ `en/ npm test`；`pack` job = 两包 `npm pack --dry-run` | `.github/workflows/ci.yml:16-21`（HEAD `a3cdfb1` 实读）|
 | **CI 可观测通道** | 本地 `origin` = fork `slchris/kixparadigm`（**无 workflow 注册、无 run 历史**）；权威 CI 在上游 `olicesx/kixparadigm` | `gh repo view`（fork）、`gh workflow list -R slchris/kixparadigm`（空）、`gh run list -R olicesx/kixparadigm`（有历史）|
 | GitHub Issues | **上游仓库 Issues 已禁用**（`hasIssuesEnabled: false`）→ 缺陷登记只能走 `progress.md` / 文档，不能提 Issue | `gh repo view --json hasIssuesEnabled` |
 | 宿主 runner 预装 | 上游 runner 镜像 README 列出 PowerShell 7.6.5（Ubuntu 24.04）/ 7.6.4（macOS 15） | `actions/runner-images` `images/ubuntu/Ubuntu2404-Readme.md:218`、`images/macos/macos-15-Readme.md:152` |
 
 > **推论（Sprint 1 核心洞察）**：CI 的 Ubuntu / Windows runner **都预装 `pwsh`**，而本机（macOS）**没有** →
-> 依赖 `pwsh` 的 3 条用例在 CI 会真跑、在本机会失败，**这条红在现有 CI 上永远不可见**。
+> 依赖 `pwsh` 的 3 条用例在 CI 会真跑、在本机会失败，**这条红在 Sprint 1 之前的 CI 上永远不可见**（当时矩阵无 macOS）。
+> Sprint 1 T3 已把 `macos-latest` 加入矩阵（`ci.yml:20`），使该平台差异**具备可见通道**；但该通道是否产出绿
+> **尚未取证**（CG2 pending）——通道存在 ≠ 可见性已建立。
 
 ---
 
@@ -150,33 +152,64 @@ en/preset-classic-en/ ──npm───▶ kixparadigm-classic-en
   - 上游 CI 在 baseline `c3c31eb` 的 `main` push（run 34699043255）**success** → 本机红为平台特异
   - `install-lib.js` zh/en md5 一致（`c53b11987c86858efec5c511b725f618`）
 
+### Sprint 1 交付（2026-09-22，终态 = `a3cdfb18b55ee16027bf268e6de7472343a611d2`）
+
+> 完整报告：`docs/sprint-1/done.md`。**`status: done` + `release_eligible: false`**（CI 未取证）。
+
+- **7/7 任务完成、0 阻塞**；required local gate **8/8 exit 0** @ `a3cdfb1`
+  （LG1–LG6 + LG10/LG11；`l2_gate_manifest_sha256 = 46121655fd8f5367052aa6c73b56a529ceb7cc966fba6390ba7b36f7b5a531cb`）。
+- **交付**：T1/T4 pwsh 能力探针 + 5 条 skip 语义统一（本机 `20 pass / 0 fail / 5 skip`）；
+  T2 安装器幂等根因修复（`copyFileKeepingMtime` 写侧数值秒；受控 A/B baseline 19/1 → HEAD 20/0）；
+  T3 CI 矩阵增 `macos-latest`；T5/T7 CHANGELOG 平台限定 + 勘误（纯追加 `58 0`）；
+  **T6（增量）** 修 macOS `os.tmpdir()` 符号链接夹具缺陷（4 副本 realpath 归一化，产品 `kix-focus.js` 零改动）。
+- **端到端**：`npm test` exit 0（链尾 60 → 59/0/1）、`cd en && npm test` exit 0（36 → 35/0/1）——链首红解除后
+  首次跑到链尾，并**立即暴露**了第二条既有红（T6 的由来，L4 记 `l2_failed: 1`）。
+- **QA 签署**：`docs/qa/qa-signoff-1.md` = **`CONDITIONAL`**（唯一理由 `ci_pending: true`）；MG1–MG6 全绿；
+  7 findings（唯一 P2 = F-1，T2 幂等断言非 hermetic）+ 4 残余不确定（R-1..R-4）。
+- **未取证（不得当作已完成）**：CG1/CG2/CG3 全部 pending；本 Sprint **不构成发布证据**。
+- **`over_budget: 1`**（实际 8 commits / derived 7，收尾产物未计为 DAG 层）——按红线如实记录，**未改写预算**。
+
 ## 8. 下一步（固定锚点）
 
-**Sprint 1 = A. 测试基线健康**（范围与门禁见 `docs/sprint-1/plan.md`）：
+**Sprint 1 = A. 测试基线健康 → `status: done`（`release_eligible: false`，2026-09-22 收尾）**。
+原 5 项范围（pwsh 探针 / 安装器幂等 / CI 加 macOS / skip 门禁化 / CHANGELOG 勘误）**全部完成**，
+并按 L2 前的新证据增量扩为 7 项（+T6 夹具修复 / +T7 CHANGELOG 补段）。终态见第 7 章与 `docs/sprint-1/done.md`。
 
-1. `sync-dsh-preset.test.js` 82/110/140 补统一 `pwsh` 可用性探针（3 条红 → 变 skip）
-2. `ensureDefaultSkillsShelf` 在 macOS 不幂等：**先取证根因再修**（1 条红转绿）
-3. CI 矩阵增 macOS runner（在 1+2 之后，避免引入长红 CI）
-4. 被 skip 的 pwsh 用例显式门禁化：**本机 skip ≠ 通过**，必须在 gate 里可区分
-5. CHANGELOG 文档漂移修正（仅限已被实测反证的声称 + 加平台限定语）
+**下一步（按优先级）**：
 
-**Sprint 1 之后（候选）**：见 `docs/sprint-1/plan.md` §Sprint+1 候选。
+1. **CI 取证（唯一解锁 `release_eligible` 的动作）**：用户授权 PR 路径后，按 CG1 → CG2 → CG3 依次执行；
+   CG2 必须核对 **6 个 matrix 组合** 与 macOS job 日志中的 `# skipped 0`。若任一组合 failure
+   → 本 Sprint 的 `done` 判定失效（falsifier 见 `done.md` §8.3），走 `REVERIFY_REQUIRED`。
+2. **Sprint 2 候选输入**（本 Sprint 已登记、未修）：
+   - F-1 / HB-4：T2 幂等断言的 **hermetic 性**（把 mtime 边界构造进 fixture）——削弱 CI 侧证据强度；
+   - OQ8 / N8：`preset-classic` / `preset-null` 两副本**不被任何 npm script 执行**（字节一致 ≠ 可运行）；
+   - R-1 / HB-5：manifest digest 的平台无关复算（现依赖 pwsh，QA 未能字节级复核）；
+   - F-2：`kix-focus.test.js:703-709` 近恒真弱断言改为显式 `skip` 语义；
+   - OQ4 / N5：baseline 对齐（上游 `main` 已领先本地，含 `v1.3.17` 的 CI failure run）；
+   - OQ6 / N2：pwsh 依赖工具链的 Node 等价实现（fidelity check / hooks）。
+3. **Sprint 2 规划期必读**：`docs/sprint-1/plan.md` §10（N1–N9 候选）、`docs/sprint-1/done.md` §9（11 项移交）、
+   `docs/sprint-1/hill-climbing.md`（L4：HB-3/4/5 candidate + U-1..U-5）。
 
 ## 9. 风险登记（固定锚点）
 
 | ID | 风险 | 影响 | 现有缓解 | 状态 |
 |---|---|---|---|---|
-| R1 | **平台特异红不可见**：CI 无 macOS，而 4 条红全部只在 macOS 出现 | 分发资产在 macOS 上的真缺陷（幂等）长期隐形 | Sprint 1 T3 加 macOS runner | open |
-| R2 | **skip 被误读为通过**：`node --test` 的 skip 不改变 exit code；本机 25 → 只有 20 真跑 | 门禁覆盖率虚高，回归静默 | Sprint 1 T4 显式门禁语义（`pass 20 ≠ 25`）| open |
+| R1 | **平台特异红不可见**：macOS 专属红（Sprint 1 前 CI 矩阵无 macOS runner，4 条红全部只在 macOS 出现）| 分发资产在 macOS 上的真缺陷（幂等）长期隐形 | Sprint 1 T3 已将 `macos-latest` 加入矩阵（`ci.yml:20`，6 组合）+ 本机 macOS 红已转绿（LG5/LG6 exit 0）；**CI 侧 success 未取证（CG2 pending）→ 可见性通道已建、尚未实际产出** | mitigated |
+| R2 | **skip 被误读为通过**：`node --test` 的 skip 不改变 exit code；本机 25 → 只有 20 真跑 | 门禁覆盖率虚高，回归静默 | Sprint 1 T4 显式门禁语义（`pass 20 ≠ 25`）+ QA MG1 逐条登记 5 条用例（源码 5 处调用点 ↔ `skipped 5`）；**CI 侧 `skipped == 0` 未取证（R-2）** | mitigated |
 | R3 | **上游 main 已领先本地**：上游存在 `v1.3.17` tag 的 CI 失败运行（2026-09-13），本地 HEAD 停在 `v1.3.16` 的 `c3c31eb` | 本 Sprint 的「红转绿」口径可能被上游新红覆盖 | 以本地 baseline `c3c31eb` 为唯一对照口径；合入前 rebase 并复跑全量 gate | open |
-| R4 | **CI 只能在 fork→上游 PR 上观测**：fork 无 workflow 注册 | ci_gate 在 PR 创建前无法执行 | ci_gate 记为 pending，PR 创建后由 `gh pr checks` 判定；无 PR 则降级 manual_gate | open |
-| R5 | **本机无 `pwsh`**：`.ps1` 全部不可执行（含 `sync-dsh-preset.ps1`、kixpower hooks、`verification-fidelity-check.ps1`）| 5 条用例只能 skip；drift-check 无法跑官方脚本 | 显式登记 skip 语义；drift-check 手工 baseline 报告 | open |
-| R6 | **文档声称与实测不符**（CHANGELOG v1.3.13「重复安装幂等」、v1.3.15「59 pass / 0 fail」）| 用户按文档预期行为，实际不符 | Sprint 1 T5 修正 + 标注测量平台 | open |
+| R4 | **CI 只能在 fork→上游 PR 上观测**：fork 无 workflow 注册，且**用户未授权 push/PR** | `ci_gate` 在 PR 创建前无法执行；Sprint 1 收尾时 CG1/CG2/CG3 **全部 pending**，本地绿不构成 CI 绿的替代证据 | ci_gate 记 pending，PR 创建后由 `gh pr checks` 判定；无 PR 则降级 manual_gate。**不得**为解锁而由 agent 自行 push/开 PR | open |
+| R5 | **本机无 `pwsh`**：`.ps1` 全部不可执行（含 `sync-dsh-preset.ps1`、kixpower hooks、`verification-fidelity-check.ps1`）| 5 条用例只能 skip（本机对 `sync-dsh-preset.ps1` 覆盖 = 0 条断言）；drift-check 无法跑官方脚本 | 显式登记 skip 语义（T1/T4 + MG1）；drift-check 手工 baseline 报告；R-1/R-2 已登记 falsifier | open |
+| R6 | **文档声称与实测不符**（CHANGELOG v1.3.13「重复安装幂等」、v1.3.15「59 pass / 0 fail」）| 用户按文档预期行为，实际不符 | Sprint 1 T5/T7 已追加勘误 + 平台限定（`CHANGELOG.md` diff = `58 0` 纯追加，QA MG2 pass）| mitigated |
 | R7 | `scripts/install-lib.js` 与 `en/scripts/install-lib.js` 字节镜像：只改一侧必致 `test:consistency` 红 | 单侧修复会引入新的红 | 守护机械拦截（`consistency-lib.cjs:691`）+ plan `target_rules` 显式列副本 | mitigated |
+| R8 | **CI 门禁未取证 = 发布解锁的唯一开口**：Sprint 1 的 `done` 建立在本地可执行范围内，`release_eligible: false` | 任何 tag / `npm publish` / 合并上游 PR 都缺少 CI 证据；且若 CG2 出现 failure，Sprint 1 的 `done` 判定即失效 | frontmatter 硬标注 `release_eligible: false` + `ci_pending: true`（`docs/sprint-1/done.md`）；falsifier 见 `done.md` §8.3（CG2 6 组合 success + macOS job `# skipped 0` 为解锁判据）| open |
 
 ---
 
 ## 10. 测试与门禁基线
+
+> **Sprint 1 终态（@ `a3cdfb1`）**：本章为**规划期基线快照**（保留不改，供对照）。终态见
+> `docs/sprint-1/done.md` §2：`npm run test:installer` = 25 → **20 / 0 / 5**、`npm test` **exit 0**（链尾 60 → 59/0/1）、
+> `cd en && npm test` **exit 0**（36 → 35/0/1）、required local gate **8/8 exit 0**；**CI 侧仍未取证**（CG1/CG2/CG3 pending）。
 
 **基线（2026-09-22，本机 macOS，`npm test` exit 1）**：
 
@@ -218,7 +251,9 @@ en/preset-classic-en/ ──npm───▶ kixparadigm-classic-en
 | 语法 | 全部 JS/CJS/MJS 可解析 | `checkSyntax` | 同上 |
 
 **改动纪律**：任何 `dsh/**` 或 `en/**` 源码改动**必须**同步其副本组；`scripts/install-lib.js` 必须同步 `en/scripts/install-lib.js`。
-本 Sprint 不改 `dsh/**`，只改 `scripts/**`、`en/scripts/install-lib.js`（镜像）、`.github/workflows/ci.yml`、`CHANGELOG.md`。
+**Sprint 1 实际改动面**（`git diff --name-only c3c31eb..HEAD` 共 18 文件）：`scripts/**`、`en/scripts/install-lib.js`（镜像）、
+`.github/workflows/ci.yml`、`CHANGELOG.md`、4 个 `**/plugins/kix-focus.test.js`（**测试夹具**，经 plan §2 修订授权）与规划/收尾文档；
+**产品源码零改动**（4 个 `kix-focus.js` 副本 md5 均为 `52346442ca28b753ff9ad9ef7856242c` = baseline 值，`git diff --name-only c3c31eb..HEAD -- '**/kix-focus.js'` 为空）。
 
 ## 12. 运行时与工具链限制
 

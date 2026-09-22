@@ -82,6 +82,142 @@
     unmatched_runs: 0
     archive_after_unmatched: null
   note: "同上：origin 即 Sprint 1，不计 unmatched；trigger 在 Sprint 2 起才可能被独立匹配。"
+
+- id: HB-3
+  type: plan-template
+  status: candidate
+  problem: >-
+    链式 canonical 入口的**覆盖遮蔽**：package.json#scripts.test = "A && B && C && D && E"。
+    Sprint 1 基线 A 红 ⇒ B–E 四段从未执行，报告只能看到 4 条失败；A 修好后立刻暴露
+    一条**既有**的链尾红（dsh/preset/plugins 的 kix-focus 夹具）。若不把链尾升为独立 gate，
+    下一次链首红会把同样的静默再次带入，且「门禁已全绿」的结论无法被复算。
+  improvement: >-
+    Producer 在 plan.md 的 verifiable_gates 中，必须为链式入口的**每一段**建立独立 required
+    local_gate（cmd 逐字取自既有 script，不新增脚本），使每一段的遗漏/回归都可被单独观测与结算；
+    端到端链式 gate 保留为附加判据，不作为唯一判据。
+  source: "Sprint 1 L2 前：LG5/LG6 在 c43d36e 上红（唯一红为链尾 kix-focus 夹具），催生 LG10/LG11 与 T6"
+  evidence:
+    - task: "Sprint 1"
+      kind: origin
+      result: observed
+  archive_reason: null
+  eval:
+    task_kinds: [sprint]
+    trigger: "plan.md 的 gate 引用了含 && 的链式命令，或项目的 canonical 测试入口本身是 && 链"
+    pass_criteria: >-
+      plan.md 中链式入口的每一段都出现为独立 required local_gate，且各段 expect 为可复算计数；
+      L2 记录能分别给出每段终态，而非只有链条整体退出码。
+    regression_signal: >-
+      plan / trace 中只存在链式整体 gate（如单条 npm test）而无分段 gate；
+      或某段失败在 Sprint 结束后才被发现。
+    applies_to_sprints: ">=2"
+    check_timing: "pre-sprint"
+    overlaps_with: [HB-2]
+    supersedes: []
+    unmatched_runs: 0
+    archive_after_unmatched: null
+  note: "与 HB-2 的区别：HB-2 管「基线的表述与计数纪律」（人如何写），HB-3 管「gate 的结构」（机器如何观测）。两者可同时命中。"
+
+- id: HB-4
+  type: qa-workflow
+  status: candidate
+  problem: >-
+    测试的非 hermetic 性：install-lib.test.js 的幂等断言以**未入库的工作树 mtime**为输入。
+    fresh checkout（仓库外 worktree @ c3c31eb）中落在失败带的文件数为 0 → baseline 在该
+    checkout 上为 20 pass / 0 fail，该断言的真实分支**不执行**；只有本机当时的 3 个带内 mtime
+    才复现 19/1。后果：CI 与新克隆的绿**不构成**该路径被验证的证据，而报告会把它读成「已验证」。
+  improvement: >-
+    凡断言依赖未入库的文件系统状态（mtime / 权限 / 目录顺序 / 时钟），必须（a）在 fixture 内
+    显式构造该状态（如复制前 utimesSync 到边界值），或（b）在断言输出中标注当前状态值使其可复算。
+    复核 baseline 声称时，必须换一个 checkout 重跑一次，而不是只读记录。
+  source: "Sprint 1 QA 独立复核：qa-signoff-1.md F-1 + lessons-learned.md LL-7（受控 A/B：in_band_count 0 → 20/0）"
+  evidence:
+    - task: "Sprint 1"
+      kind: origin
+      result: observed
+    - task: "Sprint 1"
+      kind: counterexample
+      result: fail
+  archive_reason: null
+  eval:
+    task_kinds: [sprint, review]
+    trigger: "plan / diff 中出现依赖文件系统状态（mtime/权限/顺序）或环境状态的断言"
+    pass_criteria: >-
+      该断言在 fresh checkout 上能触发其目标分支（或显式 skip 并说明状态前提）；
+      复核 baseline 声称时存在第二个 checkout 的实测记录。
+    regression_signal: >-
+      出现「本机红但 fresh checkout 绿」或「CI 绿但该路径从未执行」的证据；
+      或 QA 以单一 checkout 的记录作为 baseline 结论。
+    applies_to_sprints: ">=2"
+    check_timing: "both"
+    overlaps_with: []
+    supersedes: []
+    unmatched_runs: 0
+    archive_after_unmatched: null
+
+- id: HB-5
+  type: tooling
+  status: candidate
+  problem: >-
+    L2 信任链的核心凭据 l2_gate_manifest_sha256 在本机**无法复算**：canonical 实现
+    （kixpower-contract.ps1 的 Get-KixGateManifestJson）依赖 pwsh，而交付宿主可以没有 pwsh。
+    QA 用 80 组候选规范化均未复算出记录值 → 该 digest 只能被"信任"而无法被独立验证，
+    这削弱了「L2 → QA 交接」的机械性。
+  improvement: >-
+    （a）plan.md 必须写明 manifest 的规范化规则（字段集、排序、序列化形式、编码），使任意宿主可独立复算；
+    或（b）把 digest 计算提供平台无关实现（Node），并保留 pwsh 版为兼容层；
+    或（c）在 digest 不可复算的宿主上，把该凭据降级为 advisory 并在 QA 报告中显式标注。
+  source: "Sprint 1 QA 残余不确定 R-1（qa-signoff-1.md §8）；本机无 pwsh"
+  evidence:
+    - task: "Sprint 1"
+      kind: origin
+      result: observed
+  archive_reason: null
+  eval:
+    task_kinds: [sprint, review]
+    trigger: "L2 交接写入 manifest digest，或 QA 需要复核该 digest"
+    pass_criteria: >-
+      在无 pwsh 的宿主上，第三方可用 plan 记载的规则独立复算出同一 digest；
+      或该凭据被显式标注为不可复算并相应降级。
+    regression_signal: "QA 报告出现「digest 未能复算」而 plan 仍未记载规范化规则。"
+    applies_to_sprints: ">=2"
+    check_timing: "post-sprint"
+    overlaps_with: []
+    supersedes: []
+    unmatched_runs: 0
+    archive_after_unmatched: null
+
+- id: HB-6
+  type: plan-template
+  status: candidate
+  problem: >-
+    derived_commit_budget 的 `base = dag_layers`（每个 DAG 层 1 commit）**不为收尾产物层留位**：
+    L4 报告 / done.md / QA signoff / L2 字段固化必然产生 1 个 commit，但它不对应任何 task 节点。
+    Sprint 1 实测：derived 7（δ4 + strong1 + bug_reserve2），实际 8 → `over_budget: 1`，
+    且 over 量**恰等于收尾层**（不是提交粒度失控）。若不修正，每个 Sprint 都会稳定超 1。
+  improvement: >-
+    Producer 派生 commit_budget 时，若该 Sprint 会将收尾产物入库（done.md / hill-climbing.md /
+    qa-signoff.md / progress 的 L2 字段），应显式计入一个收尾层（或扩展 bug_reserve 语义覆盖它），
+    使预算与「可独立回滚的变更单元」真实数量一致；**预算仍不得在收尾期回头改写**（over 则如实记录）。
+  source: "Sprint 1 收尾对账：git rev-list --count c3c31eb..HEAD = 8 vs derived 7；hill-climbing.md §4"
+  evidence:
+    - task: "Sprint 1"
+      kind: origin
+      result: observed
+  archive_reason: null
+  eval:
+    task_kinds: [sprint]
+    trigger: "plan.md 生成 task_sizing.derived_commit_budget，且该 Sprint 计划写入 docs/sprint-N/{done,hill-climbing}.md 或 docs/qa/qa-signoff-N.md"
+    pass_criteria: >-
+      收官后 `git rev-list --count <baseline>..<final>` <= derived_commit_budget，
+      且无需回头改写预算字段即可结算。
+    regression_signal: "再次出现 over_budget，且 over 量恰等于收尾提交数（1）"
+    applies_to_sprints: ">=2"
+    check_timing: "post-sprint"
+    overlaps_with: []
+    supersedes: []
+    unmatched_runs: 0
+    archive_after_unmatched: null
 ```
 
 ## 应用记录
@@ -89,11 +225,13 @@
 | Sprint | 项 ID | 处置 | 结果 |
 |---|---|---|---|
 | 1 | — | 本 Sprint 规划期创建 HB-1 / HB-2（均为 candidate），不作为 trial 应用（origin == 潜在 trial，自我确证无效）| not triggered |
+| 1 | HB-3 / HB-4 / HB-5 | L4 收尾期新增（均为 candidate）：HB-3 origin = L2 前链尾红暴露；HB-4 origin = QA 受控 A/B 反证；HB-5 origin = QA 残余不确定 R-1 | not triggered（origin == Sprint 1）|
+| 1 | HB-6 | 收尾对账期新增（candidate）：origin = blast-radius 结算提醒触发的 over_budget 对账（8 vs 7，over 量 == 收尾层）| not triggered（origin == Sprint 1）|
 
 ## 统计
 
 ```yaml
-items_total: 2
-by_status: {candidate: 2, validated: 0, archived: 0}
-by_type: {dev-workflow: 1, plan-template: 1}
+items_total: 6
+by_status: {candidate: 6, validated: 0, archived: 0}
+by_type: {dev-workflow: 1, plan-template: 3, qa-workflow: 1, tooling: 1}
 ```

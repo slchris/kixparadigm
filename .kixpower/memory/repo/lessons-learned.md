@@ -12,6 +12,8 @@
 | LL-3 | 2026-09-22 | 1（规划期）| **`&&` 链式门禁的首步红会遮蔽整链**：`npm test` = `test:installer && check-dsh-consistency && test:pressures && vision && plugins`。首步红 ⇒ 后续 4 步**从未执行**。描述基线时**禁止**说「大部分通过」；必须给出「链首之后覆盖 = 0」这一结论。 | `package.json#scripts.test`；`npm test` exit 1 | observed |
 | LL-4 | 2026-09-22 | 1（规划期）| **文档声称是错误传播载体（比代码缺陷更危险）**：`CHANGELOG.md:55` 声称「复制保留 mtime 使重复安装幂等」，而该断言在本平台实测红 → 读者据文档认为已解决，缺陷因此不被排查。修正方式：**不改历史数字**，追加平台限定 + 勘误指针，并在新条目写清双口径。 | `CHANGELOG.md:40,55,58` vs `install-lib.test.js:207` 实测红 | observed |
 | LL-5 | 2026-09-22 | 1（规划期）| **强相关不等于因果（证据门禁的自我应用）**：`skills/` 63 文件的 mtime 小数部分横跨 `Math.round(sec)` 的 0.5 判定边界（50 个 ≥ 0.5），`agents/` 6 文件全部 < 0.5 —— 而只有 `skills` 的幂等断言红。相关性极强，但两个主流模型分别预测 `0` 与 `~50` 次失配，**都不预测实测的 3**。→ 高相关 + 模型不预测观测值时，先取证收口，禁止直接改代码。 | Producer 只读 stat 扫描；`install-lib.js:226-230` | observed |
+| LL-7 | 2026-09-22 | 1（QA 验收期）| **门禁的可复现性不等于「同一代码 ⇒ 同一红绿」**：`install-lib.test.js:216` 的幂等断言以**仓库工作树 skill 文件的 mtime**为输入（未入库状态）。fresh checkout 上 `dsh/preset-classic/skills` 63 文件中落在失败带 `[x.4995, x.500)` 的为 **0** → baseline 在该 checkout 上 `20 pass / 0 fail`（T2 红**不可复现**）；只有主仓当时那 3 个带内 mtime 才复现 `19/1`。**教训**：凡断言依赖「未入库的文件系统状态」，其红/绿必须标注该状态值（或把状态显式构造进 fixture），否则 CI/新克隆的绿**不构成**该路径被验证的证据；QA 复核 baseline 声称时，必须换 checkout 重跑一次而非只读记录。 | QA 受控 A/B：仓库外 worktree `c3c31eb`，`in_band_count: 0` → 20/0；置 3 文件为记录带内值 → baseline 19/1、HEAD（同 mtime）20/0；主仓只读 stat `3/63` 且 mtimeMs 与 `progress.md:226-228` 逐值相同 | observed |
+
 | LL-6 | 2026-09-22 | 1（规划期）| **fork 的 CI 盲区**：本地 `origin` 是 fork（无 workflow 注册、无 run 历史）→ 本地 push 不触发任何 CI；CI 只在上游 `olicesx/kixparadigm` 的 PR/push 上跑。设计 `ci_gate` 前必须先确认「哪个 remote 才产生 run」。 | `gh workflow list -R slchris/kixparadigm`（空）；`gh run list -R olicesx/kixparadigm`（有历史）| observed |
 
 **修剪记录**：无（本文件首次初始化）。

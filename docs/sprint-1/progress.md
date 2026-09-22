@@ -1,6 +1,6 @@
 ---
 sprint: 1
-status: in-progress
+status: done
 last_updated: 2026-09-22
 completed_tasks: 7
 total_tasks: 7                           # 增量修订（2026-09-22，L2 前）：+T6 夹具缺陷修复 / +T7 CHANGELOG 补 T6 段，见 plan.md §1 修订横幅与 §4.1
@@ -12,7 +12,7 @@ artifacts_changed_since_last_observe:
   - dsh/preset-null/plugins/kix-focus.test.js
   - en/preset-classic-en/plugins/kix-focus.test.js
   - CHANGELOG.md
-observe_fingerprint: c3c31eb3268622358761cb2035ec84810a12ca11   # 规划期 = baseline；每次 Dev 分派前由 orchestrator 刷新
+observe_fingerprint: a3cdfb18b55ee16027bf268e6de7472343a611d2   # L2 完成 revision（Dev 阶段已结束；规划期值 c3c31eb）
 sprint_baseline_sha: c3c31eb3268622358761cb2035ec84810a12ca11   # 首次 Dev 前的 HEAD（完整 40 位）
 dev_self_tests_passed:
   - "test:installer @ T1+T4 — 25 tests / 19 pass / 1 fail / 5 skip（本机无 pwsh；剩余 1 fail 为 T2 幂等红，T2 修复后应转 20/0/5）"
@@ -30,10 +30,10 @@ dev_self_tests_passed:
   - "test:consistency @ T6 — CONSISTENCY OK（LG2；4 副本夹具字节一致 md5 8f87e48f8ab27660decb66e5aab032a5；4 副本产品 kix-focus.js md5 仍为 52346442ca28b753ff9ad9ef7856242c）"
   - "node --check @ T6 — 4 个改动夹具副本 syntax OK（另 LG2 的逐目录 JS 语法扫描 dsh/preset 35 / en/preset-classic-en 26 全 OK）"
   - "反例 control @ T6 — 仓库外 scratch 副本置空 resolveEntryCandidates 的 realpath 回退 → realpath_equal: false（MG6②：断言修后仍有区分力，非恒真式）"
-l2_verification_passed: []
-l2_verified_sha: null                    # placeholder — orchestrator 在 L2 完成后写入完整 40 位 SHA
-l2_gate_manifest_sha256: null            # placeholder — plan 中全部 required local_gate 规范化 manifest 的 SHA-256
-l2_stash_refs: []                        # placeholder — L2 完成时的 git stash 引用快照
+l2_verification_passed: [LG1, LG2, LG3, LG4, LG5, LG6, LG10, LG11]
+l2_verified_sha: a3cdfb18b55ee16027bf268e6de7472343a611d2
+l2_gate_manifest_sha256: 46121655fd8f5367052aa6c73b56a529ceb7cc966fba6390ba7b36f7b5a531cb
+l2_stash_refs: []                        # L2 完成时 git stash list --format=%H 为空（orchestrator 实测）
 qa_started_sha: null                     # placeholder — QA 启动时必须 == l2_verified_sha == HEAD
 qa_verified_sha: null                    # placeholder — QA PASS/CONDITIONAL 证据对应的完整 HEAD
 qa_gate_manifest_sha256: null            # placeholder — QA 签署时复核的同一 local_gate manifest
@@ -211,6 +211,56 @@ md5 复核（MG5）：
     - docs/sprint-1/progress.md
   result: observed
   note: "LG10/LG11 聚焦 138 passed/1 failed → 139 passed/0 failed；LG5 exit 0（链尾 60 tests → 59 pass / 0 fail / 1 skip）、LG6 exit 0（36 → 35/0/1）；LG2 CONSISTENCY OK；MG5/MG6 证据见 §T6-evidence（含反例 control realpath_equal=false）。本回合 2 个 commit：T6 = 58a5ffe（仅 4 个夹具副本，产品 0 文件）、T7 = 本 progress.md 所在 commit（CHANGELOG + plan + progress）。CG1/CG2 仍 pending —— 本机绿不构成 CI 绿。"
+- at: 2026-09-22
+  stage: l2
+  stage_signal: gate_manifest
+  actor: orchestrator
+  action: "L2 全量 required local gate @ a3cdfb1：LG1/LG2/LG3/LG4/LG5/LG6/LG10/LG11 逐条执行"
+  artifacts:
+    - docs/sprint-1/progress.md
+  result: observed
+  note: "8/8 exit 0；计数与 plan 期望逐项相符（LG1 25→20/0/5；LG10 60→59/0/1；LG11 36→35/0/1；LG5/LG6 端到端 exit 0 且链尾口径同 LG10/LG11）。manifest_sha256=46121655fd8f5367052aa6c73b56a529ceb7cc966fba6390ba7b36f7b5a531cb（8 gate，按 id 排序规范化）；l2_stash_refs=[]（实测）。"
+- at: 2026-09-22
+  stage: qa
+  stage_signal: qa_signoff
+  actor: Ivy (QA)
+  action: "QA 独立复核：跑 ci_gate（pending）+ manual_gate MG1–MG6（pass）；独立复现 baseline 138/1；受控 A/B 反证 T2 断言的 hermetic 性"
+  artifacts:
+    - docs/qa/qa-signoff-1.md
+    - .kixpower/memory/repo/lessons-learned.md
+  result: observed
+  note: "签署 CONDITIONAL（唯一理由 ci_pending）；qa_started_sha == qa_verified_sha == HEAD == a3cdfb1；qa_test_changes=[]。7 findings（F-1 为 P2：幂等断言依赖未入库 mtime，fresh checkout 20/0 不触发真实分支）+ 4 残余不确定（R-1 manifest digest 未能字节级复算）。"
+- at: 2026-09-22
+  stage: l4
+  stage_signal: hill_climbing
+  actor: orchestrator
+  action: "L4 实践学习：Trace 聚合 + 期望/实际/反证 + pending trial 评估 + 模式计数 + 新增 HB-3/4/5 candidate；canonical memory lifecycle validator 以逐条忠实移植的 Node 版执行（本机无 pwsh）"
+  artifacts:
+    - docs/sprint-1/hill-climbing.md
+    - .kixpower/memory/repo/harness-backlog.md
+  result: observed
+  note: "patterns: silent_failure 0 / goal_drift 0 / l2_failed 1 / over_budget 1 / claim_evidence_failure 1。移植版 validator 输出 memory_backlog: valid / record_count 2 / legacy 0 / exit 0，并用 4 组负向控制（缺 status / 重复 id / validated 缺 trial-pass / 缺 improvement）确认非恒真；与原版对拍缺口登记为 U-2。"
+- at: 2026-09-22
+  stage: producer_closeout
+  stage_signal: done_report
+  actor: Remy (Producer)
+  action: "收尾：done.md（含 Evals 回归结果表，HB-1..HB-6 全 not triggered）+ PROJECT_BRIEF §7/§8 更新 + §6 CI matrix 更正（含 macos-latest）+ status: in-progress → done"
+  artifacts:
+    - docs/sprint-1/done.md
+    - PROJECT_BRIEF.md
+  result: observed
+  note: "release_eligible: false（CI 未取证）。QA §9『CI 全绿前不得进入 done』与最终裁决的分歧已在 done.md §8.1 原文保留 + 附 falsifier。blast-radius 结算提醒触发 over_budget 对账 → 如实记录 8/7 并生成 HB-6 candidate（收尾层未入公式），未回写预算。"
+- at: 2026-09-22
+  stage: finalize
+  stage_signal: closeout_commit
+  actor: orchestrator
+  action: "收尾提交（第 8 个 commit，docs-only）+ QA session marker 清理"
+  artifacts:
+    - docs/sprint-1/done.md
+    - docs/sprint-1/hill-climbing.md
+    - docs/qa/qa-signoff-1.md
+  result: observed
+  note: "收尾 commit 的变更面经 `git diff --name-only a3cdfb1..HEAD` 机械核对：仅 docs/**、PROJECT_BRIEF.md、.kixpower/memory/repo/**（纯文档），无 code/test/fixture/构建配置/gate 命令改动 → L2 与 QA 证据的绑定 revision 仍为 a3cdfb1，不触发 freshness 失效；并在 6d72201 上复跑 LG1/LG2 作为收尾冒烟。"
 ```
 
 ## T2 取证区（T2 步骤 A 必须在此落盘，供 MG3 校验）
