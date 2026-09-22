@@ -1,5 +1,35 @@
 # Changelog
 
+## Sprint 1（2026-09-22）测试基线健康：门禁双口径 + 安装器幂等根因修复
+
+> **非发布条目**：本 Sprint 只改门禁与安装器，未动 `package.json`，包版本仍为 `1.3.16`。
+> **测量平台口径**（下列每个门禁数字都标注平台）：**本机** = macOS + node v22.14.0 + **无 `pwsh`**；
+> **CI** = `ubuntu-latest` / `windows-latest` / `macos-latest` runner（三者镜像均预装 `pwsh`）。
+
+- **门禁双口径（同一命令，两个平台两套数字）**：`npm run test:installer` 在**本机 macOS** 为
+  25 tests → **pass 20 / fail 0 / skipped 5**（`skipped 5` 全是宿主无 `pwsh` 的**能力型 skip**，
+  **不计为通过**：本机 pass 20 ≠ 用例总数 25）；在 **CI**（三平台均预装 `pwsh`）应为
+  **pass 25 / fail 0 / skipped 0**。
+- **`sync-dsh-preset.test.js`（T1/T4）**：3 条依赖 PowerShell 的用例（原生目录 symlink、
+  大小写变体兄弟目录、fail-closed 指针）此前在本机（无 `pwsh`）直接 fail，现补 `pwsh` ENOENT
+  探针转为能力型 skip；**全部既有断言原样保留**（含 `outside the bundle` /
+  `outside the selected source` / `does not exist` 三条负向断言）与 win32 平台型 skip 语义。
+  5 条 pwsh 依赖用例的 skip 文案统一为 `SKIP: <category> — <原因>`：平台型
+  `SKIP: windows-only — …` 与能力型 `SKIP: pwsh unavailable — …` 可机械区分；源码 skip 调用数（5）
+  = `node --test` 的 `skipped` 计数（5）= qa-signoff 逐条登记数（5），计数不再含混。
+- **安装器幂等根因（T2，先取证后修）**：`copyFileKeepingMtime` 把 `st.mtime`（`Date`）传给
+  `utimesSync`，而 `Date` 的毫秒值是**四舍五入**的——源 `mtimeMs` 落在 `.5ms` 边界内的文件被向上
+  取整（实测 `1790060295499.8994 → 1790060295500`），跨过 `Math.round(mtimeMs/1000)` 的秒桶边界，
+  于是「size+mtime 相同即跳过」对这 3/63 个货架文件**永不成立**（实测第 2、第 3 次调用均为
+  `added=0 updated=3 same=60 pruned=0`）。改为传**数值秒**（`st.mtimeMs/1000`，实测保留亚毫秒
+  `→ …499.899`）后：第 2 次调用 `added=0 updated=0 same=63 pruned=0`，真实安装器连跑两次第二次为
+  「新增 0 / 更新 0 / 相同 119（classic 112）」。**比较口径未改**——量化只要不向上取整，秒桶比较
+  结构性成立。`en/scripts/install-lib.js` 字节镜像同步（`md5` 两侧一致，一致性守护通过）。
+- **CI 矩阵（T3）**：`.github/workflows/ci.yml` 的 `matrix.os` 增 `macos-latest`（保留
+  `fail-fast: false` 与 zh/en 两侧 `npm test`）。**注意**：macOS runner **也预装 `pwsh`**，
+  因此该 runner 复现/防护的是 T2 的**幂等**路径，不是 T1 的 `pwsh` 缺失路径——「加了 macOS 仍是绿」
+  不等于该 job 无价值。
+
 ## v1.3.16（2026-09-11）DSH 0.1.5-rc.1 原生适配 + MCP 代理对齐 restrict ACL
 
 ### DSH 0.1.5-rc.1 原生适配（preset 挂载失败修复）
@@ -38,6 +68,10 @@ exit 0，`autoActivated=true`）。同一 preset 在 0.1.2-rc.1 上同样 7 工�
 - **`kix-webauth`（部署面插件 + overlay 行）**：web 绑定回环且请求 Host 回环时跳过浏览器一次性 token（Host/Origin 反 DNS-rebinding 栅栏保留），非回环 / LAN / `--trusted-host` 行为与上游一致；单元测试 `kix-webauth.test.js`。
 - **docs/**：`kix-general-evolution`、`kix-runtime-verification`、`kix-vision-exemption` 三篇（研究阶段方案与运行态验收记录，含各自边界）。
 - **门禁**：`npm test` 59 pass / 0 fail / 1 skip；四变体一致性守护通过。未覆盖：外部供应商推理、故障注入、完整 Web 会话执行记账 E2E。
+- **平台限定（Sprint 1，2026-09-22）**：上条「`npm test` 59 pass / 0 fail / 1 skip」**未记录测量平台**。
+  该数字可复算的前提是宿主**具备 `pwsh`**：本机 macOS（无 `pwsh`）当时同一命令 exit 1 ——
+  `test:installer` 25 用例中 4 fail / 2 skip，且 `npm test` 是 `&&` 链，链首红使后续 4 步
+  **从未执行**。**历史数字保留不改**，本条只追加平台前提。
 
 ## v1.3.14（2026-09-09）DSH 0.1.2 对接：web_fetch 打开、webhook→会话桥、原生模型选型留档
 
@@ -56,6 +90,11 @@ exit 0，`autoActivated=true`）。同一 preset 在 0.1.2-rc.1 上同样 7 工�
 - **元规则可证伪**：registry 11 条各加 `proof{file,contains}`，校验 support 归属 → 文件存在 → 字面命中 → 非纯注释行，并排除 `PRESSURE_REGISTRY` 声明块——堵住 4/11 条 proof 的自指空转（改形真实载体即 4 条点名失败）。审计面改为显式契约 + `findUnscopedBullets` 反向断言（preamble/缩进/编号 bullet 同样被抓）；新增只读 `--deaths` 计数（7 通道 depth-0 调用 + 首末日期 + 根数），死亡条款从注释变成可结算，并补文档与 `KIX_SESSION_ROOTS`。
 - **易变事实与卫生**：yml 断言数/工具数/包数去数字改稳定引用；发布脚本去掉个人路径；persona 恢复被压缩误删的行为约束（不得据此拒绝任务/按风险/执行）并与 en 对齐（4481/4500、9464/9500）；`kix-settle` ②③ 编号对齐头部；`incentive-lessons` 求助索引补 ⑨⑩㉑；根 README 与 `dsh/README-DSH.md` 事实纠正。
 - **验收路径**：两路独立审查（单源 lens / 规则是负债 lens）→ 修复 → 独立 reviewer 攻击修复本身（3🔴：裁剪越界、proof 自指、指针未入库）→ 再修 → 独立 QA 复验 FAIL（指针未入版本控制、货架不自裁剪）→ 三修 → 复验 PASS（11/11，含 6 个负向探针）。门禁：`npm test` 25/25、`check-dsh-consistency` OK、registry `--check` exit 0、`test:pressures` 24/24、`install-lib` 20/20、安装副本 `kix-consistency` 168/0、四变体断链 0。
+- **勘误（Sprint 1，2026-09-22）**：上条「复制保留 mtime 使重复安装幂等」与「`install-lib` 20/20」
+  是**未标注测量平台**的声称，已被实测反证——本机 macOS（APFS）上 `ensureDefaultSkillsShelf`
+  第二次调用 `added+updated = 3`（`install-lib.test.js` 19 pass / 1 fail）。根因不是原注释假设的
+  「`utimes` 只有秒级精度」，而是 `copyFileKeepingMtime` 经 `Date` 传 mtime 时**四舍五入**跨过秒桶
+  边界；该缺陷已在 Sprint 1 修复（见文件顶部条目的 T2 段）。**历史数字保留不改**，本条只追加限定。
 
 ## v1.3.12（2026-09-03）skill 增量瘦身 + 运行层回仓 + 提交前语言 lint 回补
 

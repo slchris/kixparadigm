@@ -2,7 +2,7 @@
 sprint: 1
 status: in-progress
 last_updated: 2026-09-22
-completed_tasks: 4
+completed_tasks: 5
 total_tasks: 5
 blocked_tasks: 0
 open_issues: {P0: 0, P1: 0, P2: 0}      # 上游 Issues 已禁用（hasIssuesEnabled: false），缺陷只登记在本文件与 plan.md
@@ -14,6 +14,10 @@ dev_self_tests_passed:
   - "test:installer @ T1+T2+T4 — 25 tests / 20 pass / 0 fail / 5 skip（LG1）"
   - "test:consistency @ T2 — CONSISTENCY OK + install-lib.js 2 copies byte-identical（LG2）"
   - "installer E2E 幂等 @ T2 — 临时 DSH_HOME 连跑两次：第 2 次 新增 0 / 更新 0 / 相同 119+112（独立于测试断言的证据）"
+  - "test:pressures @ T3 — exit 0（LG3）"
+  - "test:vision @ T3 — exit 0（LG4）"
+  - "npm test @ T5 — **exit 1**：链首 4 步全绿（installer 20/0/5 + CONSISTENCY OK + pressures + vision），链尾 plugins 套件 58 pass / 1 fail / 1 skip；唯一红 = baseline 既有的 kix-focus macOS 夹具缺陷（LG5 未达 exit 0，见「⚠️ 范围外发现」）"
+  - "cd en && npm test @ T5 — **exit 1**：12/12 + CONSISTENCY OK + 20/20 + 链尾 34 pass / 1 fail / 1 skip，同一既有红（LG6 未达 exit 0）"
 l2_verification_passed: []
 l2_verified_sha: null                    # placeholder — orchestrator 在 L2 完成后写入完整 40 位 SHA
 l2_gate_manifest_sha256: null            # placeholder — plan 中全部 required local_gate 规范化 manifest 的 SHA-256
@@ -45,9 +49,9 @@ blast_radius:
 | T2 | `ensureDefaultSkillsShelf` 幂等：**先取证**（added/updated/same/pruned）再修最窄一层；同步 en 字节镜像 | [x] | — | `T2-evidence` 已落盘（MG3）；修复层 = 复制/mtime 保留路径 |
 | T3 | CI matrix 增加 `macos-latest` | [x] | T1, T2 | macOS runner 亦预装 pwsh → 防的是 T2 而非 T1 |
 | T4 | 5 条 pwsh 依赖用例统一可识别 skip 文案（skipped 计数 ↔ 原因一一对应）| [x] | T1 | 与 T1 同文件，串行 |
-| T5 | CHANGELOG 已反证声称追加平台限定/勘误（不改历史数字）| [ ] | T1–T4 | 需要最终门禁数字稳定后写 |
+| T5 | CHANGELOG 已反证声称追加平台限定/勘误（不改历史数字）| [x] | T1–T4 | 需要最终门禁数字稳定后写 |
 
-**合计**：5 任务，4 完成，0 阻塞。
+**合计**：5 任务，5 完成，0 阻塞。
 
 > **MG1 口径说明（供 QA 复核）**：baseline 的 `sync-dsh-preset.test.js` 已有 4 处 skip 调用点
 > （21/52 能力型 pwsh 探针 + 82/110 平台型 win32）。T1 为 82/110 追加能力型守卫后，若两类守卫
@@ -71,6 +75,38 @@ blast_radius:
 ## ❌ Blocked
 
 （无）
+
+## ⚠️ 范围外发现：LG5/LG6 仍红，且新增的 macOS CI job 会因同一原因红
+
+**不是本 Sprint 引入的**：在 baseline `c3c31eb` 的独立 worktree（detached，未含本 Sprint 任何改动）上
+复跑，失败逐字相同；`git diff --name-only c3c31eb..HEAD -- dsh en/preset-classic-en` 为空（被测文件与
+其输入均未改动）。
+
+| 项 | 现象 | 证据 |
+|---|---|---|
+| LG5 `npm test`（zh）| exit 1，链末 `dsh/preset/plugins` 套件 60 tests → 58 pass / **1 fail** / 1 skip | `/tmp/lg5.log`；`not ok 7 - kix-focus.test.js` |
+| LG6 `cd en && npm test` | exit 1，链末 36 tests → 34 pass / **1 fail** / 1 skip，同一条用例 | `/tmp/lg6.log` |
+| baseline 复现 | `kix-focus.test.js` 在 `c3c31eb` 上同为 1 fail（60/58/1）| `git worktree add --detach <tmp> c3c31eb` 后单跑 |
+
+**失败用例**：`kix-focus.test.js:691`「symlink 部署（WSL2 实测 bug 场景）: realpath 候选解析成功」。
+
+**根因（只读探针实测，非推断）**：macOS 的 `os.tmpdir()` 是 `/var/folders/…`，而 `/var` 是
+`/private/var` 的符号链接（探针：`tmpdir_is_symlinked: true`）。夹具用**字面路径**构造
+`realEntry = <tmp>/dsh-install/dsh`，而 `resolveEntryCandidates` 正确返回的是 **realpath** 形态
+（`/private/var/…/dsh-install/dsh`）——即产品行为正确（`resolved: true`），失败的是夹具的
+字符串包含断言 `c.includes(realEntry)`（`realpath_equivalent_in_candidates: true` 但字面不等）。
+Linux/Windows 的 tmp 无符号链接故相等，所以 baseline CI（ubuntu+windows）一直是绿的。
+
+**为什么现在才暴露**：`npm test` 是 `&&` 链，链首 `test:installer` 红 → 后续 4 步从未执行（LL-3）。
+T1/T2 修复后链首次跑通到底部，立即暴露出这第二个本机红。
+
+**对 gate 的影响（需 orchestrator 决策）**：
+
+- LG5 / LG6 的 `expect: exit 0` 在**本机**无法满足，除非修改 `dsh/preset/plugins/kix-focus.test.js`。
+- **T3 的 macOS job 会红**：该失败在 macOS 上是确定性的（tmpdir 必为 `/var` 符号链接），
+  故 CG2「6 个 matrix 组合 success」与 G-B「macOS job 为 success」在当前 revision 上不可达。
+  `dsh/**` 在本 Sprint 的 explicit non-goals 内（plan §2）且受 4 副本一致性守护约束，
+  Dev 不越界修改 → 记为下方 Sprint+1 候选 N6/N7，交回 Producer/orchestrator 决定是否扩范围。
 
 ## Trace Log
 
@@ -153,3 +189,10 @@ md5(scripts/install-lib.js) == md5(en/scripts/install-lib.js) == a72674afb96399c
 ## Sprint+1 候选
 
 见 `plan.md` §10（N1 Node 重写 pwsh 依赖测试 / N2 fidelity-check 的 Node 等价实现 / N3 PowerShell 5.1 覆盖 / N4 hooks 机械承载缺口 / N5 baseline 对齐例行检查）。
+
+本 Sprint 执行中新发现（范围外，未修改）：
+
+| ID | 候选 | 证据 / 触发条件 |
+|---|---|---|
+| N6 | `kix-focus.test.js:691` 夹具改用 realpath 归一化比较（`fs.realpathSync(realEntry)`），修掉 macOS `os.tmpdir()` 的 `/var → /private/var` 符号链接导致的确定性失败 | 本文「⚠️ 范围外发现」；baseline `c3c31eb` 同失败。**阻塞 G-B/CG2**：T3 新增的 macOS job 会因此红 |
+| N7 | 把「本机 macOS 链尾红」纳入例行本地门禁判读：`npm test` 的 `&&` 链首一旦解除，链尾还有第二个既有红（本次才发现）| LL-3 的推论——链式门禁的「首步红遮蔽整链」会掩盖**多于一个**既有缺陷 |
