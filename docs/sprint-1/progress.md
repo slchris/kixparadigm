@@ -2,11 +2,16 @@
 sprint: 1
 status: in-progress
 last_updated: 2026-09-22
-completed_tasks: 5
-total_tasks: 5
+completed_tasks: 7
+total_tasks: 7                           # 增量修订（2026-09-22，L2 前）：+T6 夹具缺陷修复 / +T7 CHANGELOG 补 T6 段，见 plan.md §1 修订横幅与 §4.1
 blocked_tasks: 0
 open_issues: {P0: 0, P1: 0, P2: 0}      # 上游 Issues 已禁用（hasIssuesEnabled: false），缺陷只登记在本文件与 plan.md
-artifacts_changed_since_last_observe: []
+artifacts_changed_since_last_observe:
+  - dsh/preset/plugins/kix-focus.test.js
+  - dsh/preset-classic/plugins/kix-focus.test.js
+  - dsh/preset-null/plugins/kix-focus.test.js
+  - en/preset-classic-en/plugins/kix-focus.test.js
+  - CHANGELOG.md
 observe_fingerprint: c3c31eb3268622358761cb2035ec84810a12ca11   # 规划期 = baseline；每次 Dev 分派前由 orchestrator 刷新
 sprint_baseline_sha: c3c31eb3268622358761cb2035ec84810a12ca11   # 首次 Dev 前的 HEAD（完整 40 位）
 dev_self_tests_passed:
@@ -18,6 +23,13 @@ dev_self_tests_passed:
   - "test:vision @ T3 — exit 0（LG4）"
   - "npm test @ T5 — **exit 1**：链首 4 步全绿（installer 20/0/5 + CONSISTENCY OK + pressures + vision），链尾 plugins 套件 58 pass / 1 fail / 1 skip；唯一红 = baseline 既有的 kix-focus macOS 夹具缺陷（LG5 未达 exit 0，见「⚠️ 范围外发现」）"
   - "cd en && npm test @ T5 — **exit 1**：12/12 + CONSISTENCY OK + 20/20 + 链尾 34 pass / 1 fail / 1 skip，同一既有红（LG6 未达 exit 0）"
+  - "node dsh/preset/plugins/kix-focus.test.js @ T6 — 139 passed / 0 failed（LG10；修前 138 passed / 1 failed）"
+  - "node en/preset-classic-en/plugins/kix-focus.test.js @ T6 — 139 passed / 0 failed（LG11；en 侧同一夹具）"
+  - "npm test @ T6 — **exit 0**：链首 4 步全绿（installer 20/0/5 + CONSISTENCY OK + pressures + vision）+ 链尾 60 tests → 59 pass / 0 fail / 1 skip（LG5 达标）"
+  - "cd en && npm test @ T6 — **exit 0**：12/12 + CONSISTENCY OK + 20/20 + 链尾 36 tests → 35 pass / 0 fail / 1 skip（LG6 达标）"
+  - "test:consistency @ T6 — CONSISTENCY OK（LG2；4 副本夹具字节一致 md5 8f87e48f8ab27660decb66e5aab032a5；4 副本产品 kix-focus.js md5 仍为 52346442ca28b753ff9ad9ef7856242c）"
+  - "node --check @ T6 — 4 个改动夹具副本 syntax OK（另 LG2 的逐目录 JS 语法扫描 dsh/preset 35 / en/preset-classic-en 26 全 OK）"
+  - "反例 control @ T6 — 仓库外 scratch 副本置空 resolveEntryCandidates 的 realpath 回退 → realpath_equal: false（MG6②：断言修后仍有区分力，非恒真式）"
 l2_verification_passed: []
 l2_verified_sha: null                    # placeholder — orchestrator 在 L2 完成后写入完整 40 位 SHA
 l2_gate_manifest_sha256: null            # placeholder — plan 中全部 required local_gate 规范化 manifest 的 SHA-256
@@ -28,9 +40,9 @@ qa_gate_manifest_sha256: null            # placeholder — QA 签署时复核的
 qa_test_changes: []
 qa_session_marker: docs/.kixpower-qa-session.json
 ci_pending: true                         # 规划期 CI 未跑；CONDITIONAL 只能因 CI gate pending
-topology_used: sequential                # 规划期推荐拓扑（plan.md force_sequential: true；无强制时 ω=2,γ=0.26 → hybrid）
+topology_used: sequential                # 规划期推荐拓扑（plan.md force_sequential: true；增量修订后 ω=4,γ=0.23 → 无强制时应得 parallel，被 force_sequential #1/#3 覆盖，见 plan.md §5.2）
 blast_radius:
-  commit_budget: 5                       # = plan.md task_sizing.derived_commit_budget（δ3 + strong1 + bug_reserve1）
+  commit_budget: 7                       # 增量修订 5→7 = plan.md task_sizing.derived_commit_budget（δ4 + strong1 + bug_reserve2）；不改则 T6/T7 提交会被 hook 拒绝
   branch_required: true
   block_force_push: true
   block_destructive_sql: true
@@ -50,8 +62,10 @@ blast_radius:
 | T3 | CI matrix 增加 `macos-latest` | [x] | T1, T2 | macOS runner 亦预装 pwsh → 防的是 T2 而非 T1 |
 | T4 | 5 条 pwsh 依赖用例统一可识别 skip 文案（skipped 计数 ↔ 原因一一对应）| [x] | T1 | 与 T1 同文件，串行 |
 | T5 | CHANGELOG 已反证声称追加平台限定/勘误（不改历史数字）| [x] | T1–T4 | 需要最终门禁数字稳定后写 |
+| T6 | 修 `kix-focus.test.js:691` macOS `os.tmpdir()` 符号链接**夹具**缺陷（4 副本字节同步；`kix-focus.js` 产品源码禁改）| [x] | — | 增量新增（L2 前新证据）；判据见 plan.md §4.1；证据见本文 §T6-evidence |
+| T7 | CHANGELOG Sprint 1 条目补 T6 段（最终门禁口径 `59/0/1`、`35/0/1`；纯追加）| [x] | T5, T6 | 增量新增；不改 T5 已写内容与历史条目（diff 19 added / 0 deleted）|
 
-**合计**：5 任务，5 完成，0 阻塞。
+**合计**：7 任务，7 完成，0 阻塞。（增量修订：原 5 任务 → +T6/+T7，见 plan.md §1 修订横幅）
 
 > **MG1 口径说明（供 QA 复核）**：baseline 的 `sync-dsh-preset.test.js` 已有 4 处 skip 调用点
 > （21/52 能力型 pwsh 探针 + 82/110 平台型 win32）。T1 为 82/110 追加能力型守卫后，若两类守卫
@@ -108,6 +122,51 @@ T1/T2 修复后链首次跑通到底部，立即暴露出这第二个本机红�
   `dsh/**` 在本 Sprint 的 explicit non-goals 内（plan §2）且受 4 副本一致性守护约束，
   Dev 不越界修改 → 记为下方 Sprint+1 候选 N6/N7，交回 Producer/orchestrator 决定是否扩范围。
 
+## T6-evidence（MG6 必须：独立于被修文件自身断言的证据）
+
+> 结论：**红在夹具侧，产品行为正确** → 修夹具而非产品。以下三条相互独立，且都不依赖
+> `kix-focus.test.js` 自己的断言；脚本位于仓库外 `/tmp/kix-t6/`。
+
+### ① 独立探针（不经由被修测试文件）
+
+用 realpath 归一化的临时根复现同一 symlink 布局（`tmp/bin-link` → `tmp/dsh-install`），直接调用
+`kix-focus.js` 的 `__internals`：
+
+```text
+T6-evidence-probe: tmpdir_is_symlinked: true
+                   literal_equal: false   # 夹具原比较形态（字面 /var/…）→ macOS 恒假（假红）
+                   realpath_equal: true   # 解析器返回的归一化候选（/private/var/…）→ 可用
+                   realpath_equivalent_in_candidates: true
+                   resolved: true         # defaultResolvePkg 真的解析到包 → 产品行为正确
+```
+
+### ② 反例 control（仓库外 scratch 副本，防「靠删断言 / 放宽条件变绿」）
+
+`/tmp/kix-t6/kix-focus-noRealpath.js` = `kix-focus.js` 逐字复制、仅把 `resolveEntryCandidates` 的
+realpath 回退置空（生成脚本对片段未逐字命中直接 exit 2，拒绝生成），喂给同一探针：
+
+```text
+T6-evidence-control: realpath_equal: false   # 同场景下断言修后仍能捕获该产品缺陷
+                     literal_equal: false
+```
+
+→ 断言仍有区分力：它通过是因为**候选链真的可用**，不是因为条件被放宽。**仓库内 `kix-focus.js` 全程零 diff**。
+
+### ③ diff 形态与 md5 复核（机械校验，MG5）
+
+```text
+T6-evidence-diff:
+  git diff --name-only c3c31eb..HEAD -- '**/kix-focus.js'                    → 0 行（产品零改动）
+  git diff c3c31eb..HEAD -- '*kix-focus*' 中非 kix-focus.test.js 的文件头    → 0
+  被删除的 `await ok(` 行                                                     → 0
+  4 副本 diff 内容（去掉路径行后）md5 唯一值个数                               → 1（同构改动）
+
+md5 复核（MG5）：
+  产品 4 副本 kix-focus.js       : 52346442ca28b753ff9ad9ef7856242c ×4（= baseline 值，未变）
+  夹具 4 副本 kix-focus.test.js  : 8f87e48f8ab27660decb66e5aab032a5 ×4（字节同步）
+                                  修前/baseline 值 = 4a11c76e45eb9aebe1534beb5f611c48
+```
+
 ## Trace Log
 
 ```yaml
@@ -138,6 +197,20 @@ T1/T2 修复后链首次跑通到底部，立即暴露出这第二个本机红�
     - docs/sprint-1/progress.md
   result: observed
   note: "kix-orchestration 交接校验在 Producer 分派期误报（planning 阶段本就要创建 plan/progress，校验读的是分派 prompt 的 sprint 元数据而非交接结果）；文件确认存在，非阻塞。plan.md 的 force_sequential/sequential 拓扑与 max_parallelism=2 一致。kix-guards:1250 硬 deny main 分支 commit → 已建 feature/sprint-1-test-baseline（HEAD 仍 c3c31eb，baseline 未变）"
+- at: 2026-09-22
+  stage: dev
+  stage_signal: task_status_and_artifacts
+  actor: Dev (Nova/Sage/Milo)
+  action: "T6 修 macOS tmpdir 符号链接夹具缺陷（4 副本临时根实时归一化，产品零改动）+ T7 CHANGELOG Sprint 1 条目追加 T6 段（纯追加）"
+  artifacts:
+    - dsh/preset/plugins/kix-focus.test.js
+    - dsh/preset-classic/plugins/kix-focus.test.js
+    - dsh/preset-null/plugins/kix-focus.test.js
+    - en/preset-classic-en/plugins/kix-focus.test.js
+    - CHANGELOG.md
+    - docs/sprint-1/progress.md
+  result: observed
+  note: "LG10/LG11 聚焦 138 passed/1 failed → 139 passed/0 failed；LG5 exit 0（链尾 60 tests → 59 pass / 0 fail / 1 skip）、LG6 exit 0（36 → 35/0/1）；LG2 CONSISTENCY OK；MG5/MG6 证据见 §T6-evidence（含反例 control realpath_equal=false）。本回合 2 个 commit：T6 = 58a5ffe（仅 4 个夹具副本，产品 0 文件）、T7 = 本 progress.md 所在 commit（CHANGELOG + plan + progress）。CG1/CG2 仍 pending —— 本机绿不构成 CI 绿。"
 ```
 
 ## T2 取证区（T2 步骤 A 必须在此落盘，供 MG3 校验）
@@ -196,3 +269,7 @@ md5(scripts/install-lib.js) == md5(en/scripts/install-lib.js) == a72674afb96399c
 |---|---|---|
 | N6 | `kix-focus.test.js:691` 夹具改用 realpath 归一化比较（`fs.realpathSync(realEntry)`），修掉 macOS `os.tmpdir()` 的 `/var → /private/var` 符号链接导致的确定性失败 | 本文「⚠️ 范围外发现」；baseline `c3c31eb` 同失败。**阻塞 G-B/CG2**：T3 新增的 macOS job 会因此红 |
 | N7 | 把「本机 macOS 链尾红」纳入例行本地门禁判读：`npm test` 的 `&&` 链首一旦解除，链尾还有第二个既有红（本次才发现）| LL-3 的推论——链式门禁的「首步红遮蔽整链」会掩盖**多于一个**既有缺陷 |
+
+> **归位（2026-09-22，Producer 增量重规划）**：上表 N6/N7 已**收回本 Sprint**，不再是 Sprint+1 候选——
+> N6 → **T6**（4 副本夹具修复，`kix-focus.js` 仍禁改）；N7 → 由新增的 **LG10/LG11**（链尾两套件升为独立 required local_gate）承载。
+> 详见 `plan.md` §4.1（T6/T7 与判据）与 §10（归位表 + 新增候选 N8/N9）。原文字保留不改，仅追加本注。

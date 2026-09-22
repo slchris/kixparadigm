@@ -29,6 +29,25 @@
   `fail-fast: false` 与 zh/en 两侧 `npm test`）。**注意**：macOS runner **也预装 `pwsh`**，
   因此该 runner 复现/防护的是 T2 的**幂等**路径，不是 T1 的 `pwsh` 缺失路径——「加了 macOS 仍是绿」
   不等于该 job 无价值。
+- **夹具缺陷修复（T6，只修夹具、不改产品）**：`kix-focus.test.js` 的「symlink 部署（WSL2 实测 bug
+  场景）: realpath 候选解析成功」用例在本机 macOS 上确定性失败（修前 `138 passed / 1 failed`）。
+  根因在**夹具侧**：macOS 的 `os.tmpdir()` = `/var/folders/…`，而 `/var` 是 `/private/var` 的
+  符号链接；夹具用**字面路径**构造 `realEntry`，而 `resolveEntryCandidates` 正确返回 **realpath**
+  形态的候选 → `c.includes(realEntry)` 字面不等 → `viaRealpath === false`（同一场景 `resolved ===
+  true`，即**产品行为正确**）。修法：夹具临时根**实时归一化**（`realpathSync(mkdtempSync(…))`）后
+  再派生全部路径——断言的两个合取项（`viaRealpath && resolved === true`）与其验证的语义
+  （「realpath 候选链可用」）**均未改动**，只是让该断言在 Linux/Windows/macOS 验证同一件事；
+  4 副本**字节同步**（LG2 一致性守护硬绑，其中 `preset-classic` / `preset-null` 两副本不被任何
+  npm script 执行）。**非本 Sprint 引入**：在 baseline `c3c31eb` 的独立 worktree（detached，不含
+  本 Sprint 任何改动）上逐字复现 `138/1`，且该夹具文件 baseline 与 HEAD 的 md5 相同
+  （`4a11c76e45eb9aebe1534beb5f611c48`）；4 个 `kix-focus.js` 产品副本 md5 保持
+  `52346442ca28b753ff9ad9ef7856242c`（= baseline 值）→ **产品源码零改动**。
+  **本机 macOS 最终门禁口径（修后）**：`npm test` 末段 60 tests → **pass 59 / fail 0 / skipped 1**
+  （exit 0）、`cd en && npm test` 末段 36 tests → **pass 35 / fail 0 / skipped 1**（exit 0）；
+  该 1 skip = `kix-browser.test.js:473` 的 real smoke（需 `KIX_BROWSER_SMOKE=1` opt-in），
+  **非能力型 skip**。反例 control（仓库外 scratch 副本置空 realpath 回退）仍得
+  `viaRealpath === false` → 断言修后未失去区分力（不是靠删断言/放宽条件变绿）。
+  **CI（CG1/CG2）仍 pending**：本节只陈述本机实测，不构成 CI 已绿的证据。
 
 ## v1.3.16（2026-09-11）DSH 0.1.5-rc.1 原生适配 + MCP 代理对齐 restrict ACL
 
