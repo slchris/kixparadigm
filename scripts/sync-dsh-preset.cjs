@@ -23,6 +23,11 @@
 //   3. 非交互 stdin 下 PS 的 `Read-Host` 返回空 → 视为 'n'；本实现同样 fail-closed（不覆盖、不卡住）。
 //   4. 新增 `--help`/`-h`（打印 usage 后 exit 0）：ps1 无 `-Help` 参数（传了会被 param 绑定拒绝）。
 //      仅新增入口、不改既有行为；parity 用例不喂 `--help`（参照侧无对应路径，比较无意义）。
+//   5. stdout 行终止符：ps1 的 `Write-Host` 走 `[Environment]::NewLine`（Windows `\r\n` / POSIX `\n`），
+//      而 Node 的 `process.stdout.write(str + '\n')` **硬编码 `\n`、不随 os.EOL** ⇒ 本实现显式取
+//      `os.EOL`（见 makeWriter）。CI run 35731914402（windows-latest 首次真跑 E1 差分对拍）以此
+//      **唯一分歧**抓到该移植保真度缺口（POSIX 上两侧同为 `\n`，故长期不可见）。
+//      stderr 行终止符保持 `\n`：错误输出格式本就不同（本地差异 1），且不在对拍判据内（只比 stdout）。
 
 const fs = require('node:fs')
 const os = require('node:os')
@@ -43,9 +48,16 @@ function comparePaths(a, b, caseInsensitive = CASE_INSENSITIVE) {
   return normalizePath(a, caseInsensitive) === normalizePath(b, caseInsensitive)
 }
 
-function out(line) {
-  process.stdout.write(`${line}\n`)
+// 输出层：行终止符可注入（默认宿主 EOL，见文件头差异 5）。`eol`/`stream` 做成可选参数的原因：
+// `\r\n` 分支在 POSIX 宿主上走不到（os.EOL === '\n'），而它正是 Windows E1 对拍的回归点；
+// 注入后可在本机断言该分支（scripts/sync-dsh-preset.test.js），**不新增平台型 skip**。
+// 默认值一律取宿主常量 ⇒ 既有 1 参调用点（main/readAnswer）行为与改前逐字节相同。
+function makeWriter({ eol = os.EOL, stream = process.stdout } = {}) {
+  return (line) => stream.write(`${line}${eol}`)
 }
+
+// 默认 writer：宿主 EOL + 真实 stdout（readAnswer 的默认输出通道）
+const defaultOut = makeWriter()
 
 function fail(message) {
   process.stderr.write(`${message}\n`)
@@ -196,7 +208,8 @@ function defaultDirectoryPointers(bundleRoot, sourceRoot) {
   return [path.join('dsh', 'preset', 'skills')]
 }
 
-function main(argv) {
+function main(argv, { eol = os.EOL, stdout = process.stdout } = {}) {
+  const out = makeWriter({ eol, stream: stdout })
   const args = parseArgs(argv)
   if (args.help) {
     out('usage: sync-dsh-preset.cjs [--bundle-root <dir>] [--preset-id <id>] [--source-dir <dir>]')
@@ -226,7 +239,7 @@ function main(argv) {
       if (!args.dryRun && !args.force) {
         // 非交互 stdin（无 TTY）时 Read-Host 返回空 → 'n' → fail-closed
         if (!process.stdin.isTTY) throw new SyncError('Create the target? (y/N) → n (non-interactive)')
-        const answer = readAnswer('Create the target? (y/N)')
+        const answer = readAnswer('Create the target? (y/N)', out)
         if (answer !== 'y' && answer !== 'Y') {
           process.exitCode = 1
           return 1
@@ -258,7 +271,7 @@ function main(argv) {
         if (!args.dryRun) {
           if (args.force) {
             fs.copyFileSync(entry.file, destination)
-          } else if (process.stdin.isTTY && ['y', 'Y'].includes(readAnswer(`Overwrite ${relative} ? (y/N)`))) {
+          } else if (process.stdin.isTTY && ['y', 'Y'].includes(readAnswer(`Overwrite ${relative} ? (y/N)`, out))) {
             fs.copyFileSync(entry.file, destination)
           } else {
             out(`  Skipped: ${relative}`)
@@ -295,7 +308,7 @@ function main(argv) {
   }
 }
 
-function readAnswer(question) {
+function readAnswer(question, out = defaultOut) {
   out(question)
   try {
     const buffer = Buffer.alloc(1024)
