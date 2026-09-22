@@ -2,7 +2,7 @@
 sprint: 1
 status: in-progress
 last_updated: 2026-09-22
-completed_tasks: 3
+completed_tasks: 4
 total_tasks: 5
 blocked_tasks: 0
 open_issues: {P0: 0, P1: 0, P2: 0}      # 上游 Issues 已禁用（hasIssuesEnabled: false），缺陷只登记在本文件与 plan.md
@@ -43,11 +43,11 @@ blast_radius:
 |---|---|---|---|---|
 | T1 | `sync-dsh-preset.test.js` 82/110/140 补统一 pwsh ENOENT 探针（3 条 fail → skip）| [x] | — | 保留负向断言；两类 skip 语义可区分 |
 | T2 | `ensureDefaultSkillsShelf` 幂等：**先取证**（added/updated/same/pruned）再修最窄一层；同步 en 字节镜像 | [x] | — | `T2-evidence` 已落盘（MG3）；修复层 = 复制/mtime 保留路径 |
-| T3 | CI matrix 增加 `macos-latest` | [ ] | T1, T2 | macOS runner 亦预装 pwsh → 防的是 T2 而非 T1 |
+| T3 | CI matrix 增加 `macos-latest` | [x] | T1, T2 | macOS runner 亦预装 pwsh → 防的是 T2 而非 T1 |
 | T4 | 5 条 pwsh 依赖用例统一可识别 skip 文案（skipped 计数 ↔ 原因一一对应）| [x] | T1 | 与 T1 同文件，串行 |
 | T5 | CHANGELOG 已反证声称追加平台限定/勘误（不改历史数字）| [ ] | T1–T4 | 需要最终门禁数字稳定后写 |
 
-**合计**：5 任务，3 完成，0 阻塞。
+**合计**：5 任务，4 完成，0 阻塞。
 
 > **MG1 口径说明（供 QA 复核）**：baseline 的 `sync-dsh-preset.test.js` 已有 4 处 skip 调用点
 > （21/52 能力型 pwsh 探针 + 82/110 平台型 win32）。T1 为 82/110 追加能力型守卫后，若两类守卫

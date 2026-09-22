@@ -14,7 +14,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        # macos-latest 亦预装 pwsh（actions/runner-images macos-15-Readme.md:152
+        # 列出 PowerShell 7.6.4）→ 该 runner 覆盖/防护的是安装器幂等路径（T2），
+        # 不是 pwsh 缺失路径（T1）：T1 的 3 条红在本机（无 pwsh）才可见。
+        os: [ubuntu-latest, windows-latest, macos-latest]
         node: ['20.16.0', '22.x']
     steps:
       - uses: actions/checkout@v4
