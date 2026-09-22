@@ -6,6 +6,18 @@
 #   ./install.ps1 -Uninstall
 #   ./install.ps1 -DryRun
 #   ./install.ps1 -SkipMemories      # skip user memory import
+#   ./install.ps1 -Yes               # unattended: skip the proceed confirmation
+#
+# Unattended contract (scripts / CI): `-Yes` is the ONLY accepted consent for a caller whose
+# stdin is redirected. Without it a redirected stdin fails closed with the machine-readable
+# marker KIX-INSTALLER-CONFIRM-REQUIRED and exit 3 -- stdin is not read at all, because a
+# connected-but-silent pipe would block forever (a hang is worse than a loud refusal).
+# Contract change: piping `y` into the installer is no longer accepted (was exit 0).
+# 无人值守契约：stdin 被重定向时必须显式传 -Yes；否则不读 stdin、打印
+# KIX-INSTALLER-CONFIRM-REQUIRED 并以 exit 3 失败关闭。
+# Exit codes: 0 ok / aborted by user · 1 fail-closed (KIX-INSTALLER-NO-NODE,
+#   KIX-INSTALLER-RESIDUE, general failure) · 3 KIX-INSTALLER-CONFIRM-REQUIRED
+#   (2 reserved for future usage errors).
 #
 # What it does:
 #   1. Detects COPILOT_HOME (default $HOME\.copilot)
@@ -14,10 +26,13 @@
 #   4. Copies every bundle skill containing SKILL.md -> $COPILOT_HOME\skills\
 #   5. Copies the curated agent/instruction/prompt manifests
 #   6. Copies curated user memories -> $VSCODE_MEMORY_DIR\ (unless -SkipMemories)
-#   7. Replaces placeholders in *.agent.md:
+#   7. Replaces the only real placeholder in *.agent.md:
 #        {{COPILOT_HOME}}  -> $COPILOT_HOME (forward slashes)
-#        {{HOOK_LAUNCHER}} -> pwsh -NoProfile -File
-#        {{HOOK_EXT}}      -> ps1
+#      Hook commands are literal cross-platform launchers (`node ".../<hook>.cjs"`) -> the old
+#      per-platform hook-launcher / hook-extension placeholder layer is gone entirely.
+#   8. Fails closed on: missing/too-old node (KIX-INSTALLER-NO-NODE), any unresolved `{{`
+#      left in the installed agents (KIX-INSTALLER-RESIDUE), and a redirected stdin without
+#      -Yes (KIX-INSTALLER-CONFIRM-REQUIRED, exit 3).
 #
 # Idempotent: rerunning overwrites existing files.
 
@@ -26,7 +41,8 @@ param(
     [string]$Target,
     [switch]$Uninstall,
     [switch]$DryRun,
-    [switch]$SkipMemories
+    [switch]$SkipMemories,
+    [switch]$Yes
 )
 
 $ErrorActionPreference = 'Stop'
@@ -49,6 +65,31 @@ function Show-Info([string]$msg) { Write-Host "[i] $msg" -ForegroundColor Cyan }
 function Show-OK([string]$msg)   { Write-Host "[v] $msg" -ForegroundColor Green }
 function Show-Warn([string]$msg) { Write-Host "[!] $msg" -ForegroundColor Yellow }
 function Show-Err([string]$msg)  { Write-Host "[x] $msg" -ForegroundColor Red }
+
+# --- Runtime prerequisite (方案 B：hooks 与 trust-chain 均为 Node 单一引擎) ---
+# `node` 从「npm 包的 engines 约束」升为**宿主硬前置**：Copilot 侧 4 个 hook 入口与
+# trust-chain 校验都靠它。装完不报错却在运行时静默失效，正是本 Sprint 要消灭的
+# silent failure（LL-8）→ 缺 node 或版本 < 20.16 一律非零退出，且 -DryRun 同样判定。
+$NodeMinMajor = 20
+$NodeMinMinor = 16
+function Assert-NodeRuntime([string]$Phase) {
+    if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+        Show-Err "KIX-INSTALLER-NO-NODE: node not found on PATH (phase: $Phase)"
+        Show-Err "  Copilot hooks + trust-chain are Node engines; install node >= $NodeMinMajor.$NodeMinMinor and re-run."
+        exit 1
+    }
+    $version = ("$(& node --version 2>$null)" -replace '^v', '').Trim()
+    $parts = $version.Split('.')
+    $major = 0
+    $minor = 0
+    if ($parts.Count -ge 1) { [void][int]::TryParse($parts[0], [ref]$major) }
+    if ($parts.Count -ge 2) { [void][int]::TryParse($parts[1], [ref]$minor) }
+    if ($major -lt $NodeMinMajor -or ($major -eq $NodeMinMajor -and $minor -lt $NodeMinMinor)) {
+        Show-Err "KIX-INSTALLER-NO-NODE: node $version < $NodeMinMajor.$NodeMinMinor (phase: $Phase)"
+        exit 1
+    }
+    Show-Info "node $version OK (>= $NodeMinMajor.$NodeMinMinor) [phase: $Phase]"
+}
 
 # --- Asset policy (for install, uninstall, and plan display) ---
 # Skills are convention-based: every directory containing SKILL.md is public.
@@ -104,6 +145,9 @@ if (-not (Test-Path (Join-Path $BundleRoot 'skills\kixpower'))) {
     exit 1
 }
 
+# node 前置在写入前就判定：宁可什么都不装，也不要「装完即失效」（fail-closed）。
+Assert-NodeRuntime 'pre-flight'
+
 $VscodePrompts = ''
 if (Test-Path $VscodePromptsDefault) {
     $VscodePrompts = $VscodePromptsDefault
@@ -138,12 +182,27 @@ Show-Info "  Agents ($($Agents.Count)):        $($Agents -join ', ')"
 Show-Info "  Instructions ($($Instructions.Count)):  $($Instructions -join ', ')"
 Show-Info "  Prompts ($($Prompts.Count)):       $($Prompts -join ', ')"
 Show-Info "  Memories ($($Memories.Count)):      $($Memories -join ', ')"
-Show-Info '  Hook launcher:    pwsh -NoProfile -File'
-Show-Info '  Hook extension:   .ps1'
+Show-Info '  Hook launcher:    node (cross-platform, .cjs entries)'
+Show-Info "  Node required:    >= $NodeMinMajor.$NodeMinMinor (KIX-INSTALLER-NO-NODE otherwise)"
 if ($DryRun) { Show-Info '  Mode:             DRY-RUN (no writes)' }
 Write-Host ''
-$confirm = Read-Host 'Proceed? [y/N]'
-if ($confirm -ne 'y') { Show-Info 'Aborted.'; exit 0 }
+
+# --- Consent gate (Sprint 3 T2; 与 install.sh 的契约表逐条对称) ---
+# 原缺陷：`$ErrorActionPreference = 'Stop'`（:34）+ 裸 `Read-Host` ⇒ EOF 时抛错即中止，
+# 本该执行的 Aborted 路径不可达（与 install.sh 的 `set -e` + 裸 `read` 同族）。
+# 三态：① -Yes → 不提示、不读 stdin，直接执行；② stdin 被重定向且无 -Yes → 打标记、exit 3，
+#       **不读 stdin**（连接但静默的管道会无限阻塞，挂死比明确报错更坏）；③ 真 TTY → 原交互路径。
+if ($Yes) {
+    Show-Info 'Unattended mode (-Yes): skipping the proceed confirmation.'
+} elseif ([Console]::IsInputRedirected) {
+    Show-Err 'KIX-INSTALLER-CONFIRM-REQUIRED: stdin is redirected and -Yes was not given'
+    Show-Err '  Non-interactive installs must opt in explicitly: .\install.ps1 -Yes [target]'
+    exit 3
+} else {
+    $confirm = ''
+    try { $confirm = Read-Host 'Proceed? [y/N]' } catch { $confirm = '' }
+    if ($confirm -ne 'y') { Show-Info 'Aborted.'; exit 0 }
+}
 
 # --- Execute ---
 function New-DirIfMissing($path) {
@@ -212,20 +271,51 @@ if ($VscodeMemory) {
     Show-Warn 'Memories skipped.'
 }
 
-# 6. Replace placeholders in agent.md (hook commands need forward-slash paths)
+# 拷贝完成后再判一次（装配面已就位 → 此刻缺 node 属「装完即失效」，必须挡住 ok 与收尾横幅）
+Assert-NodeRuntime 'post-copy'
+
+# 6. Replace the only real placeholder in agent.md (hook commands need forward-slash paths)
+# 作用域命中数为 0 时不许假绿（原实现无条件 Show-OK）：如实报 skip。
 $CopilotHomeFwd = $CopilotHome -replace '\\', '/'
+$placeholderHits = 0
 foreach ($a in $Agents) {
-    $ap = Join-Path $CopilotHome "agents\$a.agent.md"
+    # -DryRun 未落盘 → 作用域退回源文件，skip/ok 播报才不是「0 个」的假象
+    $ap = if ($DryRun) { Join-Path $BundleRoot "agents\$a.agent.md" } else { Join-Path $CopilotHome "agents\$a.agent.md" }
     if (-not (Test-Path $ap)) { continue }
+    if ((Get-Content -Raw $ap) -notmatch '\{\{COPILOT_HOME\}\}') { continue }
+    $placeholderHits++
     if (-not $DryRun) {
         $content = Get-Content $ap -Raw
         $content = $content -replace '\{\{COPILOT_HOME\}\}', $CopilotHomeFwd
-        $content = $content -replace '\{\{HOOK_LAUNCHER\}\}', 'pwsh -NoProfile -File'
-        $content = $content -replace '\{\{HOOK_EXT\}\}', 'ps1'
         Set-Content -Path $ap -Value $content -NoNewline
     }
 }
-Show-OK 'Replaced placeholders in agent.md files'
+if ($placeholderHits -eq 0) {
+    Show-Warn 'skip: placeholder replace (0 agent files containing {{COPILOT_HOME}})'
+} else {
+    Show-OK "Replaced {{COPILOT_HOME}} in $placeholderHits agent.md file(s)"
+}
+
+# 7. INV-H1：装完残留 '{{' ⇒ 非零退出（hook 命令会指向不存在的文件 → 静默失效）
+if ($DryRun) {
+    $residue = @()
+    foreach ($a in $Agents) {
+        $src = Join-Path $BundleRoot "agents\$a.agent.md"
+        if (-not (Test-Path $src)) { continue }
+        $body = (Get-Content -Raw $src) -replace '\{\{COPILOT_HOME\}\}', ''
+        if ($body -match '\{\{') { $residue += $src }
+    }
+} else {
+    $residue = @(Get-ChildItem -Path (Join-Path $CopilotHome 'agents') -Filter '*.agent.md' -ErrorAction SilentlyContinue |
+        Where-Object { (Get-Content -Raw $_.FullName) -match '\{\{' } |
+        ForEach-Object { $_.FullName })
+}
+if ($residue.Count -gt 0) {
+    Show-Err "KIX-INSTALLER-RESIDUE: unresolved '{{' left in agent manifests (hook commands would point at missing files):"
+    foreach ($f in $residue) { Show-Err "    $f" }
+    exit 1
+}
+Show-OK "residue check: 0 unresolved '{{' in agent manifests"
 
 Write-Host ''
 Show-Info '=== Install complete ==='

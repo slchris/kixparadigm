@@ -39,6 +39,8 @@ npm i -g kixparadigm-en  # 英文经典模式 kixparadigm-classic-en（独立包
 chmod +x install.sh && ./install.sh
 ```
 
+无人值守（CI / 脚本，stdin 非 TTY）：必须显式传 `--yes`（Windows：`-Yes`），否则安装器**不读 stdin**、以 exit 3 + `KIX-INSTALLER-CONFIRM-REQUIRED` 失败关闭；`printf 'y\n' | ./install.sh` 已不再被接受（详见 [INSTALL.md](INSTALL.md#非交互无人值守安装)）。
+
 详见 [INSTALL.md](INSTALL.md)。装完 `/kixpower-new` 开始。
 
 ## 这是什么：两层 + 插件地板
@@ -69,7 +71,7 @@ kixparadigm/
 └── install.ps1 / install.sh / INSTALL.md / CHANGELOG.md
 ```
 
-> **唯一事实源约定**：`dsh/preset/` 是事实源，`~/.dsh/.agent-presets/kixparadigm/` 只是安装副本（维护 = 改 preset 后跑 `scripts/sync-dsh-preset.ps1 -Force`）；根目录 `skills/` 等是 Copilot 分发版，与 DSH 版刻意不同，不互相覆盖。
+> **唯一事实源约定**：`dsh/preset/` 是事实源，`~/.dsh/.agent-presets/kixparadigm/` 只是安装副本（维护 = 改 preset 后跑 `node scripts/sync-dsh-preset.cjs -Force`）；根目录 `skills/` 等是 Copilot 分发版，与 DSH 版刻意不同，不互相覆盖。
 
 ## 开发与验证
 

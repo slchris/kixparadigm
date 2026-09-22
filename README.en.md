@@ -39,6 +39,8 @@ Custom DSH dir (`DSH_HOME`), `--preset-only`, ops commands (`doctor` / `uninstal
 chmod +x install.sh && ./install.sh
 ```
 
+Unattended (CI / scripts, non-TTY stdin): pass `--yes` explicitly (Windows: `-Yes`); otherwise the installer **never reads stdin** and fails closed with exit 3 + `KIX-INSTALLER-CONFIRM-REQUIRED`. Piping `y` into the installer is no longer accepted (see [INSTALL.md](INSTALL.md)).
+
 See [INSTALL.md](INSTALL.md). Start with `/kixpower-new`.
 
 ## What this is: two layers + plugin floor
@@ -69,7 +71,7 @@ kixparadigm/
 └── install.ps1 / install.sh / INSTALL.md / CHANGELOG.md
 ```
 
-> **Source-of-truth convention**: `dsh/preset/` is the source of truth; `~/.dsh/.agent-presets/kixparadigm/` is only an installed copy (maintain = edit preset, then run `scripts/sync-dsh-preset.ps1 -Force`); root `skills/` etc. are the Copilot distribution, deliberately different from the DSH edition — do not overwrite either way.
+> **Source-of-truth convention**: `dsh/preset/` is the source of truth; `~/.dsh/.agent-presets/kixparadigm/` is only an installed copy (maintain = edit preset, then run `node scripts/sync-dsh-preset.cjs -Force`); root `skills/` etc. are the Copilot distribution, deliberately different from the DSH edition — do not overwrite either way.
 
 ## Development & verification
 

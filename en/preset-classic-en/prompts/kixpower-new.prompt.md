@@ -79,7 +79,7 @@ prompt 要点：
 - 签署规则：local✅ + ci✅ + manual✅ = PASS；local✅ + ci pending + manual✅ = CONDITIONAL
 
 ### 阶段 6：L4 Hill Climbing（orchestrator 自执行，不再调子 agent）
-- 先运行 `scripts/validate-memory-backlog.ps1 -ProjectRoot <ROOT>`；失败不得收尾
+- 先运行 `node skills/kixpower/scripts/validate-memory-backlog.cjs --project-root <ROOT>`；失败不得收尾
 - 聚合 progress.md 的 Trace Log
 - 比较预期 / 结果证据 / 反证，评估 pending trial；无新信息时只记录 `novel_evidence: false`
 - 模式识别（silent_failure / goal_drift / l2_failed / over_budget 计数）只生成 candidate 资格

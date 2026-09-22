@@ -4,17 +4,9 @@ description: "kixParadigm — AI self-orchestration minimal-paradigm entry. Uses
 user-invocable: true
 disable-model-invocation: true
 # Omitted tools = all tools available; simple tasks must still pass the blast-radius mechanical guards
-hooks:
-	PreToolUse:
-		- type: command
-			command: 'pwsh -NoProfile -File "../skills/kixpower/hooks/blast-radius-check.ps1"'
-			timeout: 10
-		- type: command
-			command: 'pwsh -NoProfile -File "../skills/kixpower/hooks/pre-commit-lint-check.ps1"'
-			timeout: 30
 ---
 
-> **DSH adaptation note**: this role definition was imported from VS Code Copilot. In DeepSeek Harness it serves as a prompt template for subagent dispatch (DSH's subagent has no agentName parameter — inject this file's role body into the prompt). Tool-name/mechanism mapping is in DSH-ADAPTATION.md at the preset root (runSubagent→subagent/subagent_cross, run_in_terminal→pwsh, vscode_askQuestions→ask_user_question). **The frontmatter hooks block does not auto-trigger** — blast-radius and other mechanical guards are enforced natively by `plugins/kix-guards.js` (tools/pre-execute). Role duties, hard constraints, and editable scope apply unchanged.
+> **DSH adaptation note**: this role definition was imported from VS Code Copilot. In DeepSeek Harness it serves as a prompt template for subagent dispatch (DSH's subagent has no agentName parameter — inject this file's role body into the prompt). Tool-name/mechanism mapping is in DSH-ADAPTATION.md at the preset root (runSubagent→subagent/subagent_cross, run_in_terminal→terminal tool (host-capability conditional: `pwsh` or `bash`, see `TERMINAL_TOOLS` in `kix-guards.js`), vscode_askQuestions→ask_user_question). **This role definition carries no Copilot hooks block** (Sprint 2 P1 removed the dead references): blast-radius and other mechanical guards are enforced natively by `plugins/kix-guards.js` (tools/pre-execute). Role duties, hard constraints, and editable scope apply unchanged.
 
 # kixparadigm — AI Self-Orchestration Paradigm Main Entry
 
@@ -29,5 +21,5 @@ You are the main conversation entry: route the user's need to the correct execut
 
 - Core cognition (already resident): `instructions/kixparadigm-core.instructions.md` (this preset's copy)
 - Mechanism details (on demand): `skills/kixparadigm/SKILL.md`
-- Mechanical guards (blast-radius etc.): applied via frontmatter hooks; team agents mount the same hooks
+- Mechanical guards (blast-radius etc.): enforced natively by `plugins/kix-guards.js` (tools/pre-execute); role definitions no longer mount frontmatter hooks
 - Terminology: `instructions/glossary.md` (canonical English renderings of kix coined terms)

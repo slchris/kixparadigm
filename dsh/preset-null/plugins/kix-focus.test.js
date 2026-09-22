@@ -689,7 +689,11 @@ await ok('resolveEntryCandidates: 非 symlink entry 去重（realpath 同值不�
   return c.filter((x) => x === pluginFile).length === 1
 })())
 await ok('symlink 部署（WSL2 实测 bug 场景）: realpath 候选解析成功', (() => {
-  const tmp = fsSync.mkdtempSync(path.join(osMod.tmpdir(), 'kix-focus-res-'))
+  // 临时根必须实时归一化：macOS 的 os.tmpdir() = /var/folders/…，而 /var 是 /private/var
+  // 的符号链接；不归一化则 realEntry（字面 /var/…）与解析器返回的 realpath 候选
+  // （/private/var/…）字面不等 → 本断言在 macOS 恒假（假红）。归一化后 linkDir 与
+  // realEntry 同处归一化根下，本断言在 Linux/Windows/macOS 验证同一件事：realpath 候选链可用。
+  const tmp = fsSync.realpathSync(fsSync.mkdtempSync(path.join(osMod.tmpdir(), 'kix-focus-res-')))
   const pkgRoot = path.join(tmp, 'dsh-install')
   const nm = path.join(pkgRoot, 'node_modules', '@deepseek-ai', 'dsh-tool-subagent')
   fsSync.mkdirSync(nm, { recursive: true })

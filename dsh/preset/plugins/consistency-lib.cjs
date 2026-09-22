@@ -674,6 +674,34 @@ function checkDefaultShelfPointers({ root, rel = 'dsh/preset' }) {
   return { failures, notes }
 }
 
+// Sprint 2 的 Node 化产物（T1 contract / T2 validator / T3 fidelity / T6 hook 引擎与入口、证据网）：
+// 同一份文件随三张发行面复制（root / dsh/preset-classic / en/preset-classic-en），必须字节一致。
+// 反例边界：语言面文案（USAGE_MANUAL.md / prompts/*.prompt.md）是**翻译件**（实测三面 md5 两值）
+// → 不属本组；`agents/*.agent.md` 的 DSH 面是**适配变体** → 也不属本组。
+const SPRINT2_NODE_ARTIFACTS = [
+  'skills/kixpower/scripts/kixpower-contract.cjs',
+  'skills/kixpower/scripts/validate-memory-backlog.cjs',
+  'skills/kixpower/scripts/verification-fidelity-check.cjs',
+  'skills/kixpower/hooks/lib/kix-verdict.cjs',
+  'skills/kixpower/hooks/blast-radius-check.cjs',
+  'skills/kixpower/hooks/block-source-edit.cjs',
+  'skills/kixpower/hooks/block-source-edit-qa.cjs',
+  'skills/kixpower/hooks/block-dev-authority-edit.cjs',
+  'skills/kixpower/tests/trust-chain.test.js',
+  'skills/kixpower/tests/ps1-parity.test.js',
+  'skills/kixpower/tests/hook-engine.test.js',
+]
+
+function checkSprint2NodeArtifacts({ root }) {
+  return merge(
+    ...SPRINT2_NODE_ARTIFACTS.map((rel) => checkIdenticalSet({
+      root,
+      paths: [rel, `dsh/preset-classic/${rel}`, `en/preset-classic-en/${rel}`],
+      label: rel,
+    })),
+  )
+}
+
 function runAllZh(root) {
   return merge(
     // v1.3.0 布局：默认 preset=激励面（含 disabled 经典 persona 遗产块）；classic 独立目录
@@ -692,7 +720,11 @@ function runAllZh(root) {
     checkDefaultShelfPointers({ root }),
     checkMarkdownLinks({ root, rel: 'dsh/preset' }),
     checkMarkdownLinks({ root, rel: 'en/preset-classic-en' }),
+    // 2026-09-22（T4）：`dsh/preset/{skills,agents}` 是指向 preset-classic 的 symlink，而 walk()
+    // 不跟随 symlink → 只查 `dsh/preset` 会让 classic 面的 JS 语法**无人守护**（盲区）。
     checkSyntax({ root, rel: 'dsh/preset', label: 'dsh/preset' }),
+    checkSyntax({ root, rel: 'dsh/preset-classic', label: 'dsh/preset-classic' }),
+    checkSprint2NodeArtifacts({ root }),
     checkSyntax({ root, rel: 'en/preset-classic-en', label: 'en/preset-classic-en' }),
     checkSyntax({ root, rel: 'dsh/vision-bridge', label: 'dsh/vision-bridge' }),
     checkSyntax({ root, rel: 'en/bridge', label: 'en/bridge' }),
@@ -721,6 +753,8 @@ module.exports = {
   checkPersonaBudget,
   checkIdenticalSet,
   checkMirrorTree,
+  SPRINT2_NODE_ARTIFACTS,
+  checkSprint2NodeArtifacts,
   PRESET_MARKERS,
   checkDefaultShelfPointers,
   DEFAULT_SHELF_NAMES,

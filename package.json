@@ -38,7 +38,7 @@
   ],
   "scripts": {
     "postinstall": "node scripts/install-lib.js --quiet",
-    "test:installer": "node --test scripts/install-lib.test.js scripts/sync-dsh-preset.test.js",
+    "test:installer": "node --test scripts/install-lib.test.js scripts/sync-dsh-preset.test.js scripts/copilot-installer.test.js",
     "test:consistency": "node scripts/check-dsh-consistency.cjs",
     "test:vision": "node --test dsh/vision-bridge/test.js",
     "test:pressures": "node scripts/audit-selection-pressure-history.cjs --check && node --test scripts/audit-selection-pressure-history.test.js scripts/audit-delegation-history.test.js",

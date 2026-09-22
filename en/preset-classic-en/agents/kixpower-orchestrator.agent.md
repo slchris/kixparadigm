@@ -4,30 +4,9 @@ description: "Kixpower orchestrator. Chains kixpower-producer, kixpower-dev, and
 user-invocable: true
 # 省略 tools 字段 = 所有工具可用（含 MCP GitHub、扩展工具、runSubagent 子 agent 调用）
 agents: [kixpower-producer, kixpower-dev, kixpower-qa, kixpower-reviewer]
-hooks:
-  PreToolUse:
-    - type: command
-      command: 'pwsh -NoProfile -File "../skills/kixpower/hooks/validate-handoff.ps1"'
-      timeout: 10
-    - type: command
-      command: 'pwsh -NoProfile -File "../skills/kixpower/hooks/validate-qa-signoff.ps1"'
-      timeout: 10
-    - type: command
-      command: 'pwsh -NoProfile -File "../skills/kixpower/hooks/block-source-edit.ps1" -Role orchestrator'
-      timeout: 10
-    - type: command
-      command: 'pwsh -NoProfile -File "../skills/kixpower/hooks/blast-radius-check.ps1"'
-      timeout: 10
-    - type: command
-      command: 'pwsh -NoProfile -File "../skills/kixpower/hooks/pre-commit-lint-check.ps1"'
-      timeout: 30
-  PostToolUse:
-    - type: command
-      command: 'pwsh -NoProfile -File "../skills/kixpower/hooks/cleanup-qa-session.ps1"'
-      timeout: 10
 ---
 
-> **DSH 适配注记**：本角色定义从 VS Code Copilot 导入，在 DeepSeek Harness 中作为 subagent 分派的 prompt 模板使用（DSH 的 subagent 无 agentName 参数，把本文件角色 body 注入 prompt 即可）。文档中的工具名/机制映射见 classic 档 DSH-ADAPTATION.md（runSubagent→subagent/subagent_cross、run_in_terminal→pwsh、vscode_askQuestions→ask_user_question、codegraphy_*→grep/read）。**机械门禁中的 blast_radius_* 由 `plugins/kix-guards.js` 自动强制（tools/pre-execute）；tool_failure 熔断是按错误类型执行的模型纪律，不伪称插件自动强制**；跨厂商子代理用 `subagent_cross`（kix-route 自动取反厂商），不写死模型字符串。角色职责、硬约束、可编辑范围原样生效。
+> **DSH 适配注记**：本角色定义从 VS Code Copilot 导入，在 DeepSeek Harness 中作为 subagent 分派的 prompt 模板使用（DSH 的 subagent 无 agentName 参数，把本文件角色 body 注入 prompt 即可）。文档中的工具名/机制映射见 classic 档 DSH-ADAPTATION.md（runSubagent→subagent/subagent_cross、run_in_terminal→终端工具（宿主能力条件：`pwsh` 或 `bash`，见 `kix-guards.js` 的 `TERMINAL_TOOLS`）、vscode_askQuestions→ask_user_question、read_file→read、grep_search→grep、replace_string_in_file→edit、codegraphy_*→grep/read）。**本角色定义不携带 Copilot hooks 块**（Sprint 2 P1 清理死引用）：机械门禁中的 blast_radius_* 由 `plugins/kix-guards.js` 自动强制（tools/pre-execute）；tool_failure 熔断是按错误类型执行的模型纪律，不伪称插件自动强制；跨厂商子代理用 `subagent_cross`（kix-route 自动取反厂商），不写死模型字符串。角色职责、硬约束、可编辑范围原样生效。
 
 # Kixpower Orchestrator — 全流程编排器
 
@@ -105,7 +84,7 @@ L1/L2 是单 Sprint 内的；L4 是跨 Sprint 的复利效应（build learning l
 | **tool_failure_circuit_breaker** | 参数/schema 首错禁止原样重试；权限按 denial/approval 契约；幂等暂态最多 3 次总尝试（含首次） | 修正参数；仅 schema 不可满足时换面；不得换面绕权限，记入 progress.md | 模型自律 |
 | **single_subagent_retry_cap** | 单个 stage 的子 agent 最多重试 1 次（指 Producer/Dev/QA 三大阶段） | 仍失败 → Blocked 区块，交回用户 | 模型自律 |
 | **l2_verification_retry_cap** | L2 Verification Loop 内的 rubric-retry 最多 2 次（独立预算，不计入 stage retry） | 超出 → 转 Inner/Outer Dual Loop | 模型自律 |
-| **blast_radius_commit_budget** | **task_sizing 派生**（v5.0 公式：`dag_layers + strong_coupling_count + bug_reserve`，硬上限 10）| `blast-radius-check.ps1` hook 三级回退（progress.md → plan.md task_sizing → 冷启动兜底 3），超 hard_cap=10 硬阻止，超 derived 阻止可调，超 warn_threshold 软警告。v5.0 详见 TEAM_CONVENTIONS.md §Task Sizing。**反过拟合注**：旧 v4.x 公式 `ceil(task_count/3)+...` 对 dae Sprint1(k=7) 恰得 5，与被批的旧硬编码常数 5 巧合相等（因果倒置），v5.0 改用 δ 驱动后得 6，证明有信息增量 | ✅ **kix-guards 插件强制**（commit budget：reflog %gs 口径只数 commit 类条目 / hard cap 10 / progress.md → plan.md task_sizing → plan.md max_commits 兜底链 / 冷启动 3 必 warn / 过期 sprint 指针回退最大编号，v7） |
+| **blast_radius_commit_budget** | **task_sizing 派生**（v5.0 公式：`dag_layers + strong_coupling_count + bug_reserve`，硬上限 10）| `kix-guards` blast-radius 机械门禁三级回退（progress.md → plan.md task_sizing → 冷启动兜底 3），超 hard_cap=10 硬阻止，超 derived 阻止可调，超 warn_threshold 软警告。v5.0 详见 TEAM_CONVENTIONS.md §Task Sizing。**反过拟合注**：旧 v4.x 公式 `ceil(task_count/3)+...` 对 dae Sprint1(k=7) 恰得 5，与被批的旧硬编码常数 5 巧合相等（因果倒置），v5.0 改用 δ 驱动后得 6，证明有信息增量 | ✅ **kix-guards 插件强制**（commit budget：reflog %gs 口径只数 commit 类条目 / hard cap 10 / progress.md → plan.md task_sizing → plan.md max_commits 兜底链 / 冷启动 3 必 warn / 过期 sprint 指针回退最大编号，v7） |
 | **blast_radius_branch** | 必须在 feature branch | hook 硬拦在 main/master 的 commit | ✅ **kix-guards 插件强制**（真实分支检查） |
 | **blast_radius_force_push** | git push --force | hook 硬拦，需用户确认 | ✅ **kix-guards 插件强制**（force push 检测；需确认时聊天内提问） |
 | **blast_radius_destructive_sql** | DROP/TRUNCATE/DELETE without WHERE | hook 硬拦 | ✅ **kix-guards 插件强制**（语句级判定） |
@@ -553,7 +532,7 @@ prompts:
 
 QA 签署完成（PASS 或 CONDITIONAL）后，**orchestrator 自己**执行 L4（不再调子 agent，避免 token）：
 
-1. **先运行 canonical Memory lifecycle validator**：`scripts/validate-memory-backlog.ps1 -ProjectRoot <ROOT>`；失败则停止收尾，不把自由文本当作生命周期记录。
+1. **先运行 canonical Memory lifecycle validator**：`node skills/kixpower/scripts/validate-memory-backlog.cjs --project-root <ROOT>`；失败则停止收尾，不把自由文本当作生命周期记录。**无 Node 宿主时**该步记 `unavailable`（不得当作通过），并显式登记缺哪条能力。
 2. **聚合 Trace Log**（progress.md 的所有 trace entries），对比本 Sprint 的预期 / 可观测结果 / 反证；即使无异常，也在 hill-climbing 报告记录 `novel_evidence: false`，不写 memory
 3. **先评估实践项**：先证明 candidate trial 确实进入 plan / 执行链，再按 `eval.pass_criteria` 与 `regression_signal` 读取真实 gate / trace。未实际应用 → 保持 pending；pass → `validated`；fail 或反证 → 保持 `candidate` 并修正；独立证据直接证伪 → `archived`。本 Sprint 已应用的 validated 项若命中 regression / 反证，降回 candidate 并追加 counterexample
 4. **模式识别**（以下信号只产生 candidate 资格，不直接成为规则）：

@@ -18,7 +18,7 @@ cd C:\Users\<你>\Desktop\kix-bundle
 .\install.ps1
 ```
 
-确认安装计划后输入 `y`。
+确认安装计划后输入 `y`（无人值守安装用 `-Yes`，见 [非交互（无人值守）安装](#非交互无人值守安装)）。
 
 **自定义 copilot 主目录**：
 ```powershell
@@ -47,6 +47,38 @@ chmod +x install.sh
 ```bash
 ./install.sh /opt/copilot
 ```
+
+---
+
+## 非交互（无人值守）安装
+
+CI、脚本与任何 stdin 被重定向的调用必须**显式**选择无人值守模式——安装器不会读 stdin 去猜：
+
+```powershell
+.\install.ps1 -Yes                 # Windows
+```
+```bash
+./install.sh --yes                 # macOS / Linux（等价短开关：-y）
+```
+
+| 场景 | 行为 |
+|------|------|
+| 显式开关（`-Yes` / `--yes` / `-y`） | 跳过确认提示，直接安装 |
+| **stdin 被重定向且未给开关** | **不读 stdin**，打印 `KIX-INSTALLER-CONFIRM-REQUIRED` 并以 **exit 3** 失败关闭 |
+| 真 TTY 交互 | 照常提示 `Proceed? [y/N]`；非 `y`（含 EOF / Ctrl-D）⇒ `Aborted.` + exit 0 |
+
+> **契约反转（有意变更）**：`printf 'y\n' \| ./install.sh` **不再被接受**（旧行为 exit 0 ⇒ 现为 exit 3）。
+> 原因：管道已连接但暂无可读数据时 `read` 会**无限阻塞**——挂死无法机械判定，比明确报错更坏。
+> 需要非交互安装时请显式传 `--yes` / `-Yes`。
+
+### 退出码
+
+| 码 | 含义 | 机器可识别标记 |
+|----|------|----------------|
+| `0` | 成功 / 用户在提示处取消 | — |
+| `1` | fail-closed（前置或装配面缺失、一般失败） | `KIX-INSTALLER-NO-NODE`、`KIX-INSTALLER-RESIDUE` |
+| `3` | 非交互且未显式同意 | `KIX-INSTALLER-CONFIRM-REQUIRED` |
+| `2` | 保留（将来的 usage error） | — |
 
 ---
 
@@ -114,3 +146,4 @@ Skills 按 `skills/*/SKILL.md` 自动发现并全部安装。Memories 是精选�
 | hook 未触发 | agent.md 占位符未替换成功，检查 `{{COPILOT_HOME}}` 是否已变成实际路径 |
 | 记忆未加载 | memory 目录路径随 VS Code 版本可能变化，确认 `globalStorage/github.copilot-chat/memory-tool/memories/` 存在 |
 | `git not found` 警告 | 仅影响 kixpower 部分安全 hook，其余功能不受影响 |
+| `KIX-INSTALLER-CONFIRM-REQUIRED`（exit 3） | 非交互调用（stdin 被重定向/无 TTY）未显式同意：加 `--yes`（Windows：`-Yes`）后重跑 |

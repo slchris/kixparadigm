@@ -7,22 +7,26 @@ agents: [kixpower-producer, kixpower-dev, kixpower-qa, kixpower-reviewer]
 hooks:
   PreToolUse:
     - type: command
+      # 宿主能力条件：本命令属 H-set-B（未移植）→ 无 pwsh 的宿主上不触发（见 skills/kixpower/hooks/README.md）
       command: 'pwsh -NoProfile -File "{{COPILOT_HOME}}/skills/kixpower/hooks/validate-handoff.ps1"'
       timeout: 10
     - type: command
+      # 宿主能力条件：本命令属 H-set-B（未移植）→ 无 pwsh 的宿主上不触发（见 skills/kixpower/hooks/README.md）
       command: 'pwsh -NoProfile -File "{{COPILOT_HOME}}/skills/kixpower/hooks/validate-qa-signoff.ps1"'
       timeout: 10
     - type: command
-      command: 'pwsh -NoProfile -File "{{COPILOT_HOME}}/skills/kixpower/hooks/block-source-edit.ps1" -Role orchestrator'
+      command: 'node "{{COPILOT_HOME}}/skills/kixpower/hooks/block-source-edit.cjs" --role orchestrator'
       timeout: 10
     - type: command
-      command: 'pwsh -NoProfile -File "{{COPILOT_HOME}}/skills/kixpower/hooks/blast-radius-check.ps1"'
+      command: 'node "{{COPILOT_HOME}}/skills/kixpower/hooks/blast-radius-check.cjs"'
       timeout: 10
     - type: command
+      # 宿主能力条件：本命令属 H-set-B（未移植）→ 无 pwsh 的宿主上不触发（见 skills/kixpower/hooks/README.md）
       command: 'pwsh -NoProfile -File "{{COPILOT_HOME}}/skills/kixpower/hooks/pre-commit-lint-check.ps1"'
       timeout: 30
   PostToolUse:
     - type: command
+      # 宿主能力条件：本命令属 H-set-B（未移植）→ 无 pwsh 的宿主上不触发（见 skills/kixpower/hooks/README.md）
       command: 'pwsh -NoProfile -File "{{COPILOT_HOME}}/skills/kixpower/hooks/cleanup-qa-session.ps1"'
       timeout: 10
 ---

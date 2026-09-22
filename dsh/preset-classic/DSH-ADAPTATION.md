@@ -303,7 +303,7 @@ kix 三通道/盲点补足在 DSH 上的行为红线，不是操作手册。
 - `kix-commands.js` 头部注释「对照…现状」→ 标注 P1-8 落地前
 
 **归一（bundle ↔ preset 单一事实源）**：本 preset 内容回灌为
-`kix-bundle/dsh/preset/`（DSH 唯一事实源），`scripts/sync-dsh-preset.ps1` 单向同步到
+`kix-bundle/dsh/preset/`（DSH 唯一事实源），`node scripts/sync-dsh-preset.cjs` 单向同步到
 `~/.dsh/.agent-presets/kixparadigm/`；补入此前缺失的 `kixpower-workflow.template.md`
 （P2-10 验证 gate 模板）与 `kix-commands.test.js`。根目录 Copilot 分发版与
 `dsh/preset/` DSH 版刻意分离，互不覆盖（见 `dsh/README-DSH.md`）。

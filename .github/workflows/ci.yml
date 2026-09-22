@@ -14,7 +14,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        # macos-latest 亦预装 pwsh（actions/runner-images macos-15-Readme.md:152
+        # 列出 PowerShell 7.6.4）→ 该 runner 覆盖/防护的是安装器幂等路径（T2），
+        # 不是 pwsh 缺失路径（T1）：T1 的 3 条红在本机（无 pwsh）才可见。
+        os: [ubuntu-latest, windows-latest, macos-latest]
         node: ['20.16.0', '22.x']
     steps:
       - uses: actions/checkout@v4
@@ -26,6 +29,139 @@ jobs:
       - name: Test en package (DSH preset)
         run: npm test
         working-directory: en
+      # E1 差分对拍的唯一载体（plan.md §16.3 CG4 + §13.1 T6 步骤 D）：runner 预装 pwsh。
+      # 三态进程退出码：0=PASS / 1=FAIL（已证伪，记 P0 并回退对应 .cjs）/ 2=unavailable（能力缺失，不计入通过）。
+      # 为何需要这层 shell 映射：`node --test`（本机 Node 22.14 实测）把任何失败**归一化为 exit 1**，
+      # 测试进程自身无法表达「能力缺失」与「已证伪」的区别 → 在 CI step 层按状态行机械定档。
+      # 本地无 pwsh ⇒ 本地恒 unavailable（LG10 记 unavailable，禁止写成 skip/pass/「已等价」）。
+      # ⚠ `shell: bash` 是**承重声明，不得删除**：GHA 在 Windows 上的默认 shell 是 pwsh，
+      #   本 step 是 bash 脚本（if/then/fi、`[ -eq ]`、grep）⇒ 缺此声明时 Windows 上会被
+      #   PowerShell 解析并报 `ParserError: Missing '(' after 'if'`（run 35731531661 实证）。
+      #   即：Win 侧 parity 曾**结构上不可能执行**，只是长期被前序失败跳过而掩盖。
+      #   Windows runner 自带 Git Bash，`shell: bash` 在三个 OS 上均可用。
+      - name: Parity vs pwsh reference (E1, three-state)
+        shell: bash
+        run: |
+          set +e
+          node --test skills/kixpower/tests/ps1-parity.test.js > parity.log 2>&1
+          code=$?
+          cat parity.log
+          if grep -q 'parity: unavailable' parity.log; then
+            echo "E1 parity: unavailable（runner 无 pwsh → 不计入通过；检查镜像证据变更）"
+            exit 2
+          fi
+          if grep -q 'parity: FAIL' parity.log; then
+            echo "E1 parity: FAIL（已证伪「忠实移植」→ 记 P0 并回退对应 .cjs）"
+            exit 1
+          fi
+          if grep -q 'parity: PASS' parity.log && [ "$code" -eq 0 ]; then
+            echo "E1 parity: PASS（stdout 逐字节一致 + exit code 一致）"
+            exit 0
+          fi
+          echo "E1 parity: 状态行缺失或 harness 自检失败（exit=$code）→ unmet"
+          exit 1
+
+      # ── CG5 载体（plan §3.6 T5）：installer 无人值守验证 ────────────────────────────
+      # 本 Sprint 之前 ci.yml **没有任何 installer 执行步骤** ⇒ C5 无载体。三条纪律：
+      #   ① 失败即红：不用 `|| true`、不设 continue-on-error（step 结论本身就是证据）；
+      #   ② 非零退出码必须被**逐一断言**（不是被吞掉）：断言 exit 码 + 机器可识别标记，二者缺一即红；
+      #   ③ 追加在 parity step **之后** ⇒ 即使此处红，Windows 侧 parity 也已获得首次运行机会（§8-R2）。
+      # 本机（darwin）无 pwsh ⇒ ps1 分支的行为证据只能在此产生（plan §3.3 P3/P4 未取证）。
+      - name: Installer unattended (sh, CG5)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          # GHA 的 bash 默认带 -e（`bash -e {0}`）⇒ 用 set +e 才能捕获**预期非零**的退出码，
+          # 与既有 parity step 同法。这不是 `|| true`：下面每个退出码都被逐一断言。
+          set +e
+          tmp="$(mktemp -d)"
+          # VS Code 面重定向进临时目录：dry-run 也会 mkdir target 目录，不得写 runner 的真实 home
+          export VSCODE_PROMPTS_DIR="$tmp/vscode-prompts"
+          export VSCODE_MEMORY_DIR="$tmp/vscode-memory"
+          mkdir -p "$VSCODE_PROMPTS_DIR" "$VSCODE_MEMORY_DIR"
+          fail=0
+
+          # ① 正向（开关给出的无人值守路径）：exit 0，且输出**不含** CONFIRM 标记（标记非恒真的反向控制）
+          bash install.sh --dry-run --yes "$tmp/copilot-home" </dev/null >"$tmp/yes.log" 2>&1
+          yes_code=$?
+          cat "$tmp/yes.log"
+          [ "$yes_code" -eq 0 ] || { echo "::error::install.sh --dry-run --yes exit=$yes_code（期望 0）"; fail=1; }
+          if grep -q 'KIX-INSTALLER-CONFIRM-REQUIRED' "$tmp/yes.log"; then
+            echo "::error::--yes 正向路径出现 KIX-INSTALLER-CONFIRM-REQUIRED（标记判定恒真 ⇒ 负向证据无效）"
+            fail=1
+          fi
+
+          # ② 负向（非 TTY 且无开关）：exit 3 + 标记。修复前为**静默 exit 1 无输出**（本 Sprint 的缺陷一）
+          bash install.sh --dry-run "$tmp/copilot-home" </dev/null >"$tmp/noflag.log" 2>&1
+          noflag_code=$?
+          cat "$tmp/noflag.log"
+          [ "$noflag_code" -eq 3 ] || { echo "::error::install.sh --dry-run（无 --yes）exit=$noflag_code（期望 3）"; fail=1; }
+          grep -q 'KIX-INSTALLER-CONFIRM-REQUIRED' "$tmp/noflag.log" \
+            || { echo "::error::缺 KIX-INSTALLER-CONFIRM-REQUIRED（非交互失败必须机器可识别）"; fail=1; }
+
+          rm -rf "$tmp"
+          exit "$fail"
+
+      # ps1 侧（windows）：install.ps1 的首次可执行验证。PowerShell 无 `<` 输入重定向运算符 ⇒
+      # 用 `'' | pwsh ...` 构造等价的「stdin 已重定向」（子进程 stdin 为管道 ⇒ IsInputRedirected 为真）。
+      - name: Installer unattended (pwsh, CG5)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tmp = Join-Path $env:RUNNER_TEMP 'kix-installer-cg5'
+          New-Item -ItemType Directory -Path $tmp -Force | Out-Null
+          $installer = Join-Path $PWD 'install.ps1'
+          $fail = 0
+
+          function Invoke-Installer([string[]]$InstallerArgs) {
+            $text = '' | & pwsh -NoProfile -File $installer @InstallerArgs 2>&1 | Out-String
+            return [pscustomobject]@{ Code = $LASTEXITCODE; Output = $text }
+          }
+
+          # ① 正向：-Yes ⇒ exit 0，且输出不含标记（反向控制）
+          $yes = Invoke-Installer @('-DryRun', '-Yes', '-Target', (Join-Path $tmp 'copilot-home'))
+          Write-Host $yes.Output
+          if ($yes.Code -ne 0) { Write-Host "::error::install.ps1 -DryRun -Yes exit=$($yes.Code)（期望 0）"; $fail = 1 }
+          if ($yes.Output -match 'KIX-INSTALLER-CONFIRM-REQUIRED') {
+            Write-Host '::error::-Yes 正向路径出现 KIX-INSTALLER-CONFIRM-REQUIRED（标记判定恒真 ⇒ 负向证据无效）'; $fail = 1
+          }
+
+          # ② 负向：stdin 已重定向且无 -Yes ⇒ exit 3 + 标记（OQ15/OQ16 的判定点）
+          $noflag = Invoke-Installer @('-DryRun', '-Target', (Join-Path $tmp 'copilot-home'))
+          Write-Host $noflag.Output
+          if ($noflag.Code -ne 3) { Write-Host "::error::install.ps1 -DryRun（无 -Yes）exit=$($noflag.Code)（期望 3）"; $fail = 1 }
+          if ($noflag.Output -notmatch 'KIX-INSTALLER-CONFIRM-REQUIRED') {
+            Write-Host '::error::缺 KIX-INSTALLER-CONFIRM-REQUIRED（非交互失败必须机器可识别）'; $fail = 1
+          }
+
+          # 必须显式 exit：GHA 会在 step 末尾追加 `exit $LASTEXITCODE`，而最后一次原生调用是**预期非零**的
+          exit $fail
+
+      # 真装 + 残留断言（brief T4.1 的载体）：-DryRun 不落盘 ⇒ 只有真装能证明占位符替换面真的闭合。
+      - name: Installer real install + residue (pwsh, CG5)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $target = Join-Path $env:RUNNER_TEMP 'kix-installer-real'   # 临时 COPILOT_HOME（-Target 即其等价形式）
+          New-Item -ItemType Directory -Path $target -Force | Out-Null
+
+          $text = '' | & pwsh -NoProfile -File (Join-Path $PWD 'install.ps1') -Yes -Target $target -SkipMemories 2>&1 | Out-String
+          $code = $LASTEXITCODE
+          Write-Host $text
+
+          $fail = 0
+          if ($code -ne 0) { Write-Host "::error::install.ps1 -Yes（真装）exit=$code（期望 0）"; $fail = 1 }
+          $agents = @(Get-ChildItem -Path (Join-Path $target 'agents') -Filter '*.agent.md' -ErrorAction SilentlyContinue)
+          if ($agents.Count -eq 0) { Write-Host "::error::真装未落盘任何 agent 清单（断言将恒真 ⇒ 无效）"; $fail = 1 }
+          $residue = @($agents | Where-Object { (Get-Content -Raw $_.FullName) -match '\{\{' })
+          if ($residue.Count -ne 0) {
+            Write-Host "::error::装完仍有未解析 '{{' 残留：$($residue.Name -join ', ')"; $fail = 1
+          } else {
+            Write-Host "[v] residue check: 0 unresolved '{{' in $($agents.Count) installed agent manifests"
+          }
+          exit $fail
 
   pack:
     name: pack dry-run

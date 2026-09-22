@@ -184,12 +184,17 @@ function resolveLinkedDir(p, entry) {
 }
 
 /** 复制文件并保留源 mtime——否则 copyFileSync 会刷新目标 mtime，使
- *  「size+mtime 相同即跳过」的幂等判断永远失效（每次安装都全量重写）。 */
+ *  「size+mtime 相同即跳过」的幂等判断永远失效（每次安装都全量重写）。
+ *  必须传**数值秒**（`st.mtimeMs/1000`）而不是 `st.mtime`：Date 只保留毫秒且
+ *  **四舍五入**，源 mtimeMs 落在 .5ms 边界内的文件会被向上取整（实测
+ *  1790060295499.8994 → 1790060295500.000），跨过秒桶边界后「size+mtime 相同」
+ *  永不成立——每次安装都重写这几个文件，且第三次调用仍为 3（非一次性抖动）。
+ *  数值秒路径实测保留亚毫秒值（→ 1790060295499.899），量化只向下截断。 */
 function copyFileKeepingMtime(s, d) {
   fs.copyFileSync(s, d)
   try {
     const st = fs.statSync(s)
-    fs.utimesSync(d, st.atime, st.mtime)
+    fs.utimesSync(d, st.atimeMs / 1000, st.mtimeMs / 1000)
   } catch {
     /* 平台不支持 utimes 时退化为普通复制（仅多一次写入） */
   }
@@ -225,7 +230,8 @@ function copyTree(src, dst, log, opts = {}) {
           added.push(path.relative(src, s))
         } else {
           const a = fs.statSync(s), b = fs.statSync(d)
-          // utimes 只有秒级精度，mtimeMs 的亚毫秒差会让幂等判断永远不成立。
+          // 秒桶容差比较。前提是写侧不把 mtime **向上**取整（见 copyFileKeepingMtime）：
+          // 截断型量化不会跨桶，四舍五入会（实测 3/63 文件因此永久失配）。
           if (a.size === b.size && Math.round(a.mtimeMs / 1000) === Math.round(b.mtimeMs / 1000)) same.push(path.relative(src, s))
           else { copyFileKeepingMtime(s, d); updated.push(path.relative(src, s)) }
         }

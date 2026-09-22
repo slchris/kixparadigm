@@ -4,17 +4,9 @@ description: "kixParadigm — AI 自编排最小范式主入口。按任务规�
 user-invocable: true
 disable-model-invocation: true
 # 省略 tools = 全部工具可用；简单任务也必须经过 blast-radius 机械门禁
-hooks:
-	PreToolUse:
-		- type: command
-			command: 'pwsh -NoProfile -File "../skills/kixpower/hooks/blast-radius-check.ps1"'
-			timeout: 10
-		- type: command
-			command: 'pwsh -NoProfile -File "../skills/kixpower/hooks/pre-commit-lint-check.ps1"'
-			timeout: 30
 ---
 
-> **DSH 适配注记**：本角色定义从 VS Code Copilot 导入，在 DeepSeek Harness 中作为 subagent 分派的 prompt 模板使用（DSH 的 subagent 无 agentName 参数，把本文件角色 body 注入 prompt 即可）。文档中的工具名/机制映射见 classic 档 DSH-ADAPTATION.md（runSubagent→subagent/subagent_cross、run_in_terminal→pwsh、vscode_askQuestions→ask_user_question）。**frontmatter 的 hooks 块不自动触发**——blast-radius 等机械门禁已由 `plugins/kix-guards.js`（tools/pre-execute）原生强制。角色职责、硬约束、可编辑范围原样生效。
+> **DSH 适配注记**：本角色定义从 VS Code Copilot 导入，在 DeepSeek Harness 中作为 subagent 分派的 prompt 模板使用（DSH 的 subagent 无 agentName 参数，把本文件角色 body 注入 prompt 即可）。文档中的工具名/机制映射见 classic 档 DSH-ADAPTATION.md（runSubagent→subagent/subagent_cross、run_in_terminal→终端工具（宿主能力条件：`pwsh` 或 `bash`，见 `kix-guards.js` 的 `TERMINAL_TOOLS`）、vscode_askQuestions→ask_user_question）。**本角色定义不携带 Copilot hooks 块**（Sprint 2 P1 清理死引用）：blast-radius 等机械门禁由 `plugins/kix-guards.js`（tools/pre-execute）原生强制。角色职责、硬约束、可编辑范围原样生效。
 
 # kixparadigm — AI 自编排范式主入口
 
@@ -29,4 +21,4 @@ hooks:
 
 - 核心认知（已常驻）：`~/.copilot/instructions/kixparadigm-core.instructions.md`
 - 机制细节（按需）：`~/.copilot/skills/kixparadigm/SKILL.md`
-- 机械门禁（blast-radius 等）：由 frontmatter hooks 生效，团队 agent 同样挂载
+- 机械门禁（blast-radius 等）：由 `plugins/kix-guards.js`（tools/pre-execute）原生强制，角色定义不再挂载 frontmatter hooks
