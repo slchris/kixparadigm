@@ -12,8 +12,12 @@
 //      `KIX-INSTALLER-NO-NODE`（`node` 在方案 B 下是 Copilot 侧 hook 与 trust-chain 的宿主硬前置）。
 //   ⑤ 静态对称：两个 installer 必须携带同一组失败关闭标记，且旧占位符层（hook launcher / hook extension
 //      token）命中数为 0 —— `install.ps1` 本地无 pwsh，可执行验证只能走 CG5（CI windows），此处只做静态判据。
+//   ⑥ 非交互同意门（Sprint 3 T1）：`--yes` 正向 exit 0 且标记不出现（反向控制）／无开关 + stdin 关闭
+//      ⇒ **exit 3** + `KIX-INSTALLER-CONFIRM-REQUIRED`（修复前为静默 exit 1 无输出）／管道喂 `y`
+//      ⇒ exit 3（契约反转钉死）。TTY 交互路径在无 pty 的 harness 中不可断言 ⇒ 静态判据 + 本地人工证据。
 //
 // win32：bash 段以平台型 skip 收口（文案机器可识别 `SKIP: windows-only — `），静态段照常运行。
+// Sprint 3 T1 起 bash 段**必须**显式传 `--yes`（harness 默认 `input: ''` = stdin 已关闭）。
 
 const test = require('node:test')
 const assert = require('node:assert/strict')
@@ -63,13 +67,15 @@ function targetEnv(root) {
   }
 }
 
-function runInstaller(bundle, home, { args = [], env = {}, path: pathOverride = null } = {}) {
+function runInstaller(bundle, home, { args = [], env = {}, path: pathOverride = null, input = '' } = {}) {
   const childEnv = { ...process.env, ...targetEnv(path.dirname(home)), ...env }
   if (pathOverride !== null) childEnv.PATH = pathOverride
   return spawnSync(BASH, [path.join(bundle, 'install.sh'), ...args, home], {
     cwd: bundle,
     encoding: 'utf8',
-    input: 'y\n',
+    // 默认 `input: ''` = stdin 已关闭（非 TTY + 立即 EOF）：Sprint 3 T1 起无人值守路径必须显式传
+    // `--yes`，否则 consent gate 以 exit 3 失败关闭 —— 旧的 `input: 'y\n'` 已不再被接受（契约反转）。
+    input,
     env: childEnv,
   })
 }
@@ -127,7 +133,7 @@ test('install.sh 正向：装入临时 COPILOT_HOME → exit 0 且装完 0 个�
   const home = makeTarget(bundle)
   t.after(() => fs.rmSync(bundle, { recursive: true, force: true }))
 
-  const result = runInstaller(bundle, home)
+  const result = runInstaller(bundle, home, { args: ['--yes'] })
   assert.equal(result.status, 0, result.stderr || result.stdout)
 
   const residue = listFiles(path.join(home, 'agents'))
@@ -156,7 +162,7 @@ test('install.sh 负向-residue：注入 {{KIX_RESIDUE_PROBE}} → exit ≠ 0 �
   const home = makeTarget(bundle)
   t.after(() => fs.rmSync(bundle, { recursive: true, force: true }))
 
-  const result = runInstaller(bundle, home, { args: ['--dry-run'] })
+  const result = runInstaller(bundle, home, { args: ['--dry-run', '--yes'] })
   assert.notEqual(result.status, 0, `残留占位符未 fail-closed：${result.stdout}`)
   assert.match(result.stdout + result.stderr, /KIX-INSTALLER-RESIDUE/)
   assert.equal(listFiles(path.join(home, 'agents')).length, 0, 'dry-run 不应落盘')
@@ -168,7 +174,7 @@ test('install.sh 空作用域：0 个 .sh → 输出 skip: chmod +x (0 .sh files
   const home = makeTarget(bundle)
   t.after(() => fs.rmSync(bundle, { recursive: true, force: true }))
 
-  const result = runInstaller(bundle, home)
+  const result = runInstaller(bundle, home, { args: ['--yes'] })
   assert.equal(result.status, 0, result.stderr || result.stdout)
   assert.match(result.stdout, /skip: chmod \+x \(0 \.sh files\)/)
   assertNoOkChmod(result.stdout)
@@ -181,7 +187,7 @@ test('install.sh 负向-node：低版本 node（v18.4.0）→ exit ≠ 0 且含 
   const stub = makeVersionStubBin('18.4.0')
   t.after(() => { fs.rmSync(bundle, { recursive: true, force: true }); fs.rmSync(stub, { recursive: true, force: true }) })
 
-  const result = runInstaller(bundle, home, { args: ['--dry-run'], path: `${stub}${path.delimiter}${process.env.PATH}` })
+  const result = runInstaller(bundle, home, { args: ['--dry-run', '--yes'], path: `${stub}${path.delimiter}${process.env.PATH}` })
   assert.notEqual(result.status, 0, `低版本 node 未 fail-closed：${result.stdout}`)
   assert.match(result.stdout + result.stderr, /KIX-INSTALLER-NO-NODE/)
 })
@@ -193,15 +199,74 @@ test('install.sh 负向-node：PATH 无 node → exit ≠ 0 且含 KIX-INSTALLER
   t.after(() => { fs.rmSync(bundle, { recursive: true, force: true }); fs.rmSync(bin, { recursive: true, force: true }) })
   assert.deepEqual(missing, [], `夹具缺外部命令：${missing.join(', ')}`)
 
-  const result = runInstaller(bundle, home, { args: ['--dry-run'], path: bin })
+  const result = runInstaller(bundle, home, { args: ['--dry-run', '--yes'], path: bin })
   assert.notEqual(result.status, 0, `无 node 未 fail-closed：${result.stdout}`)
   assert.match(result.stdout + result.stderr, /KIX-INSTALLER-NO-NODE/)
+})
+
+// ── ⑥ 非交互同意门（Sprint 3 T1；plan §3.1 契约表 + §6 LG7/MG1）─────────────
+// 原缺陷：`set -euo pipefail`（install.sh:29）+ 裸 `read` ⇒ stdin EOF 时 read 返回非零，set -e
+// 立即中止，`info "Aborted."; exit 0` 不可达 ⇒ 表现为**静默 exit 1 且无任何输出**。
+// 新契约：非 TTY 调用必须显式 `--yes`；否则**不读 stdin**、打印 `KIX-INSTALLER-CONFIRM-REQUIRED`
+// 并以 exit 3 失败关闭（管道喂 `y` 亦不再被接受 —— plan P6 的契约反转）。
+// TTY 交互路径（`read` + `Aborted.` + exit 0）在无 pty 的 spawn harness 中不可断言 ⇒ 本文件不覆盖
+// （本地人工证据：`script -q /dev/null` 下 `y` ⇒ 走完安装、`n`/EOF ⇒ Aborted + exit 0）。
+// **不新增平台型 skip**（LG1 要求 `# skipped` 恒为 0）。
+const CONFIRM_MARKER = 'KIX-INSTALLER-CONFIRM-REQUIRED'
+const CONFIRM_PATTERN = new RegExp(CONFIRM_MARKER)
+
+test('install.sh --yes 无人值守（stdin 关闭）→ exit 0 且输出不含 CONFIRM 标记', { skip: POSIX ? false : `${SKIP_WINDOWS_ONLY}bash installer` }, (t) => {
+  const bundle = makeTempBundle()
+  const home = makeTarget(bundle)
+  t.after(() => fs.rmSync(bundle, { recursive: true, force: true }))
+
+  const result = runInstaller(bundle, home, { args: ['--dry-run', '--yes'], input: '' })
+  assert.equal(result.status, 0, result.stderr || result.stdout)
+  // 反向控制（证明下一条用例的标记判定非恒真）：显式开关给出的正向路径不得出现该标记
+  assert.doesNotMatch(result.stdout + result.stderr, CONFIRM_PATTERN)
+  assert.equal(listFiles(path.join(home, 'agents')).length, 0, 'dry-run 不应落盘')
+})
+
+test('install.sh 无 --yes + stdin 关闭 → exit 3 + KIX-INSTALLER-CONFIRM-REQUIRED（原为静默 exit 1 无输出）', { skip: POSIX ? false : `${SKIP_WINDOWS_ONLY}bash installer` }, (t) => {
+  const bundle = makeTempBundle()
+  const home = makeTarget(bundle)
+  t.after(() => fs.rmSync(bundle, { recursive: true, force: true }))
+
+  const result = runInstaller(bundle, home, { args: ['--dry-run'], input: '' })
+  assert.equal(result.status, 3, `非交互且无开关未按 exit 3 失败关闭：${result.stdout}${result.stderr}`)
+  const combined = result.stdout + result.stderr
+  assert.match(combined, CONFIRM_PATTERN)
+  // 「静默」本身是被修掉的缺陷：标记与输出必须同时存在（exit 码 + 机器可识别标记双判据）
+  assert.ok(combined.trim().length > 0, '失败关闭路径不得无输出（本缺陷的原始表现）')
+  assert.equal(listFiles(path.join(home, 'agents')).length, 0, '未获同意不应落盘')
+})
+
+test('install.sh 管道喂 y（非 TTY 且无 --yes）→ exit 3 + 标记（契约反转：旧行为 exit 0）', { skip: POSIX ? false : `${SKIP_WINDOWS_ONLY}bash installer` }, (t) => {
+  const bundle = makeTempBundle()
+  const home = makeTarget(bundle)
+  t.after(() => fs.rmSync(bundle, { recursive: true, force: true }))
+
+  const result = runInstaller(bundle, home, { args: ['--dry-run'], input: 'y\n' })
+  assert.equal(result.status, 3, `管道喂 y 未被拒绝（契约反转未生效）：${result.stdout}${result.stderr}`)
+  assert.match(result.stdout + result.stderr, CONFIRM_PATTERN)
+  assert.equal(listFiles(path.join(home, 'agents')).length, 0, '未获显式同意不应落盘')
 })
 
 // ── ⑤ 静态对称（install.ps1 的本地唯一通道）────────────────────────────────
 test('两个 installer 静态对称：失败关闭标记齐备 + 旧占位符层 0 命中', () => {
   const sh = fs.readFileSync(INSTALL_SH, 'utf8')
   const ps1 = fs.readFileSync(INSTALL_PS1, 'utf8')
+  // Sprint 3 T1/T2 契约表（plan §3.1）的静态判据 = MG1：两侧标记名逐字相同、各有开关解析与非 TTY
+  // 判定、该分支退出码同为 3。**只证明声明存在，不证明行为**（ps1 行为只能走 CG5）。
+  const contract = [
+    ['install.sh', sh, [/--yes/, /-y\|--yes\)/, /\[ ! -t 0 \]/, /if ! read -r -p "Proceed\? \[y\/N\] " confirm; then/]],
+    ['install.ps1', ps1, [/\[switch\]\$Yes/, /\[Console\]::IsInputRedirected/, /try \{ \$confirm = Read-Host 'Proceed\? \[y\/N\]' \} catch/]],
+  ]
+  for (const [name, text, patterns] of contract) {
+    assert.match(text, CONFIRM_PATTERN, `${name} 缺 CONFIRM 失败关闭标记`)
+    assert.match(text, new RegExp(`${CONFIRM_MARKER}[\\s\\S]{0,400}?exit 3`), `${name} CONFIRM 分支未以 exit 3 收口`)
+    for (const pattern of patterns) assert.match(text, pattern, `${name} 缺契约元素 ${pattern}`)
+  }
   for (const [name, text] of [['install.sh', sh], ['install.ps1', ps1]]) {
     assert.match(text, /KIX-INSTALLER-NO-NODE/, `${name} 缺 node 失败关闭标记`)
     assert.match(text, /KIX-INSTALLER-RESIDUE/, `${name} 缺残留失败关闭标记`)

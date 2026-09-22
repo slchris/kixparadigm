@@ -6,6 +6,18 @@
 #   ./install.ps1 -Uninstall
 #   ./install.ps1 -DryRun
 #   ./install.ps1 -SkipMemories      # skip user memory import
+#   ./install.ps1 -Yes               # unattended: skip the proceed confirmation
+#
+# Unattended contract (scripts / CI): `-Yes` is the ONLY accepted consent for a caller whose
+# stdin is redirected. Without it a redirected stdin fails closed with the machine-readable
+# marker KIX-INSTALLER-CONFIRM-REQUIRED and exit 3 -- stdin is not read at all, because a
+# connected-but-silent pipe would block forever (a hang is worse than a loud refusal).
+# Contract change: piping `y` into the installer is no longer accepted (was exit 0).
+# 无人值守契约：stdin 被重定向时必须显式传 -Yes；否则不读 stdin、打印
+# KIX-INSTALLER-CONFIRM-REQUIRED 并以 exit 3 失败关闭。
+# Exit codes: 0 ok / aborted by user · 1 fail-closed (KIX-INSTALLER-NO-NODE,
+#   KIX-INSTALLER-RESIDUE, general failure) · 3 KIX-INSTALLER-CONFIRM-REQUIRED
+#   (2 reserved for future usage errors).
 #
 # What it does:
 #   1. Detects COPILOT_HOME (default $HOME\.copilot)
@@ -18,8 +30,9 @@
 #        {{COPILOT_HOME}}  -> $COPILOT_HOME (forward slashes)
 #      Hook commands are literal cross-platform launchers (`node ".../<hook>.cjs"`) -> the old
 #      per-platform hook-launcher / hook-extension placeholder layer is gone entirely.
-#   8. Fails closed on: missing/too-old node (KIX-INSTALLER-NO-NODE) and any unresolved `{{`
-#      left in the installed agents (KIX-INSTALLER-RESIDUE).
+#   8. Fails closed on: missing/too-old node (KIX-INSTALLER-NO-NODE), any unresolved `{{`
+#      left in the installed agents (KIX-INSTALLER-RESIDUE), and a redirected stdin without
+#      -Yes (KIX-INSTALLER-CONFIRM-REQUIRED, exit 3).
 #
 # Idempotent: rerunning overwrites existing files.
 
@@ -28,7 +41,8 @@ param(
     [string]$Target,
     [switch]$Uninstall,
     [switch]$DryRun,
-    [switch]$SkipMemories
+    [switch]$SkipMemories,
+    [switch]$Yes
 )
 
 $ErrorActionPreference = 'Stop'
@@ -172,8 +186,23 @@ Show-Info '  Hook launcher:    node (cross-platform, .cjs entries)'
 Show-Info "  Node required:    >= $NodeMinMajor.$NodeMinMinor (KIX-INSTALLER-NO-NODE otherwise)"
 if ($DryRun) { Show-Info '  Mode:             DRY-RUN (no writes)' }
 Write-Host ''
-$confirm = Read-Host 'Proceed? [y/N]'
-if ($confirm -ne 'y') { Show-Info 'Aborted.'; exit 0 }
+
+# --- Consent gate (Sprint 3 T2; 与 install.sh 的契约表逐条对称) ---
+# 原缺陷：`$ErrorActionPreference = 'Stop'`（:34）+ 裸 `Read-Host` ⇒ EOF 时抛错即中止，
+# 本该执行的 Aborted 路径不可达（与 install.sh 的 `set -e` + 裸 `read` 同族）。
+# 三态：① -Yes → 不提示、不读 stdin，直接执行；② stdin 被重定向且无 -Yes → 打标记、exit 3，
+#       **不读 stdin**（连接但静默的管道会无限阻塞，挂死比明确报错更坏）；③ 真 TTY → 原交互路径。
+if ($Yes) {
+    Show-Info 'Unattended mode (-Yes): skipping the proceed confirmation.'
+} elseif ([Console]::IsInputRedirected) {
+    Show-Err 'KIX-INSTALLER-CONFIRM-REQUIRED: stdin is redirected and -Yes was not given'
+    Show-Err '  Non-interactive installs must opt in explicitly: .\install.ps1 -Yes [target]'
+    exit 3
+} else {
+    $confirm = ''
+    try { $confirm = Read-Host 'Proceed? [y/N]' } catch { $confirm = '' }
+    if ($confirm -ne 'y') { Show-Info 'Aborted.'; exit 0 }
+}
 
 # --- Execute ---
 function New-DirIfMissing($path) {

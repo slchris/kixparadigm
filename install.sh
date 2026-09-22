@@ -7,6 +7,18 @@
 #   ./install.sh --uninstall           # remove kix bundle
 #   ./install.sh --dry-run             # preview without writing
 #   ./install.sh --skip-memories       # skip user memory import
+#   ./install.sh --yes                 # unattended: skip the proceed confirmation (-y)
+#
+# Unattended contract (scripts / CI): `--yes` (or `-y`) is the ONLY accepted consent
+# for a non-TTY caller. Without it a non-TTY stdin fails closed with the machine-readable
+# marker KIX-INSTALLER-CONFIRM-REQUIRED and exit 3 -- stdin is not read at all, because a
+# connected-but-silent pipe would block forever (a hang is worse than a loud refusal).
+# Contract change: `printf 'y\n' | ./install.sh` is no longer accepted (was exit 0).
+# 无人值守契约：非 TTY 调用必须显式传 --yes/-y；否则不读 stdin、打印
+# KIX-INSTALLER-CONFIRM-REQUIRED 并以 exit 3 失败关闭。
+# Exit codes: 0 ok / aborted by user · 1 fail-closed (KIX-INSTALLER-NO-NODE,
+#   KIX-INSTALLER-RESIDUE, general failure) · 3 KIX-INSTALLER-CONFIRM-REQUIRED
+#   (2 reserved for future usage errors).
 #
 # What it does:
 #   1. Detects COPILOT_HOME (default ~/.copilot)
@@ -20,8 +32,9 @@
 #      Hook commands are literal cross-platform launchers (`node ".../<hook>.cjs"`) that need
 #      no per-platform substitution -> the old hook-launcher / hook-extension placeholder layer
 #      is gone entirely (its tokens no longer appear anywhere in this installer).
-#   8. Fails closed on: missing/too-old node (KIX-INSTALLER-NO-NODE) and any unresolved
-#      `{{` left in the installed agents (KIX-INSTALLER-RESIDUE).
+#   8. Fails closed on: missing/too-old node (KIX-INSTALLER-NO-NODE), any unresolved
+#      `{{` left in the installed agents (KIX-INSTALLER-RESIDUE), and a non-TTY call
+#      without `--yes` (KIX-INSTALLER-CONFIRM-REQUIRED, exit 3).
 #   9. chmod +x all .sh hooks/scripts under skills/ (reports `skip:` when the scope is empty)
 #
 # Idempotent: rerunning overwrites existing files.
@@ -34,6 +47,7 @@ BUNDLE_ROOT="${SCRIPT_DIR}"
 ACTION="install"
 DRY_RUN=0
 SKIP_MEMORIES=0
+ASSUME_YES=0
 CUSTOM_TARGET=""
 
 for arg in "$@"; do
@@ -41,6 +55,7 @@ for arg in "$@"; do
     --uninstall)     ACTION="uninstall" ;;
     --dry-run)       DRY_RUN=1 ;;
     --skip-memories) SKIP_MEMORIES=1 ;;
+    -y|--yes)        ASSUME_YES=1 ;;
     -h|--help)
       grep '^#' "$0" | sed 's/^# \{0,1\}//'
       exit 0 ;;
@@ -190,8 +205,29 @@ info "  Hook launcher:    node (cross-platform, .cjs entries)"
 info "  Node required:    >= ${NODE_MIN_MAJOR}.${NODE_MIN_MINOR} (KIX-INSTALLER-NO-NODE otherwise)"
 [ "$DRY_RUN" -eq 1 ] && info "  Mode:             DRY-RUN (no writes)"
 echo ""
-read -r -p "Proceed? [y/N] " confirm
-if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then info "Aborted."; exit 0; fi
+
+# --- Consent gate (Sprint 3 T1) ---
+# 原缺陷：`set -euo pipefail`（:29）+ 裸 `read` ⇒ stdin EOF 时 read 返回非零，set -e 立即中止，
+# 本该执行的 `info "Aborted."; exit 0` 不可达 ⇒ 表现为「静默 exit 1 且无任何输出」。
+# 三态设计（plan.md §3.1 契约表）：
+#   ① --yes/-y     → 不提示、不读 stdin，直接执行（无人值守唯一接受的同意形式）
+#   ② 非 TTY 且无开关 → **不读 stdin**、打标记、exit 3。为何不「先读一行」：管道已连接但暂无
+#      数据时 read 会无限阻塞 ⇒ 挂死比明确报错更坏（无输出、无退出码、不可机械判定）。
+#   ③ TTY          → 照常提示；非 y / EOF / Ctrl-D ⇒ Aborted + exit 0（read 返回值必须显式接管）
+if [ "$ASSUME_YES" -eq 1 ]; then
+  info "Unattended mode (--yes): skipping the proceed confirmation."
+elif [ ! -t 0 ]; then
+  err "KIX-INSTALLER-CONFIRM-REQUIRED: stdin is not a TTY and --yes/-y was not given"
+  err "  Non-interactive installs must opt in explicitly: ./install.sh --yes [target]"
+  exit 3
+else
+  confirm=""
+  if ! read -r -p "Proceed? [y/N] " confirm; then
+    # EOF / Ctrl-D：显式接管 read 的非零返回，否则 set -e 会中止（正是本缺陷的根因）
+    confirm=""
+  fi
+  if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then info "Aborted."; exit 0; fi
+fi
 
 # --- Execute ---
 mkdir -p "$COPILOT_HOME/skills" "$COPILOT_HOME/agents" "$COPILOT_HOME/instructions"

@@ -39,6 +39,8 @@ Custom DSH dir (`DSH_HOME`), `--preset-only`, ops commands (`doctor` / `uninstal
 chmod +x install.sh && ./install.sh
 ```
 
+Unattended (CI / scripts, non-TTY stdin): pass `--yes` explicitly (Windows: `-Yes`); otherwise the installer **never reads stdin** and fails closed with exit 3 + `KIX-INSTALLER-CONFIRM-REQUIRED`. Piping `y` into the installer is no longer accepted (see [INSTALL.md](INSTALL.md)).
+
 See [INSTALL.md](INSTALL.md). Start with `/kixpower-new`.
 
 ## What this is: two layers + plugin floor
