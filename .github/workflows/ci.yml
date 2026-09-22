@@ -34,7 +34,13 @@ jobs:
       # 为何需要这层 shell 映射：`node --test`（本机 Node 22.14 实测）把任何失败**归一化为 exit 1**，
       # 测试进程自身无法表达「能力缺失」与「已证伪」的区别 → 在 CI step 层按状态行机械定档。
       # 本地无 pwsh ⇒ 本地恒 unavailable（LG10 记 unavailable，禁止写成 skip/pass/「已等价」）。
+      # ⚠ `shell: bash` 是**承重声明，不得删除**：GHA 在 Windows 上的默认 shell 是 pwsh，
+      #   本 step 是 bash 脚本（if/then/fi、`[ -eq ]`、grep）⇒ 缺此声明时 Windows 上会被
+      #   PowerShell 解析并报 `ParserError: Missing '(' after 'if'`（run 35731531661 实证）。
+      #   即：Win 侧 parity 曾**结构上不可能执行**，只是长期被前序失败跳过而掩盖。
+      #   Windows runner 自带 Git Bash，`shell: bash` 在三个 OS 上均可用。
       - name: Parity vs pwsh reference (E1, three-state)
+        shell: bash
         run: |
           set +e
           node --test skills/kixpower/tests/ps1-parity.test.js > parity.log 2>&1
