@@ -14,7 +14,9 @@ updated: 2026-09-22
 > 每次阶段过渡由 Producer 更新。易变数字不双源维护：版本史看 `CHANGELOG.md`，机制映射看
 > `dsh/preset-classic/DSH-ADAPTATION.md`。
 >
-> **本 Sprint 起点**：Sprint 1（模式 0：已有代码项目导入），baseline = `c3c31eb3268622358761cb2035ec84810a12ca11`。
+> **本 Sprint 起点**：Sprint 2（B. 宿主平价：无 pwsh 宿主一等公民），baseline = `ef6a48550a40bf433555790419fd4c2fd0cf1483`。
+> 上一 Sprint（Sprint 1，模式 0：已有代码项目导入）baseline = `c3c31eb3268622358761cb2035ec84810a12ca11`，终态见第 7 章。
+> Sprint 2 的计划/进度/环境快照见 `docs/sprint-2/`。
 
 ---
 
@@ -175,20 +177,63 @@ en/preset-classic-en/ ──npm───▶ kixparadigm-classic-en
 原 5 项范围（pwsh 探针 / 安装器幂等 / CI 加 macOS / skip 门禁化 / CHANGELOG 勘误）**全部完成**，
 并按 L2 前的新证据增量扩为 7 项（+T6 夹具修复 / +T7 CHANGELOG 补段）。终态见第 7 章与 `docs/sprint-1/done.md`。
 
+> **追加说明（2026-09-22，Sprint 2 规划期；不改写上文与 Sprint 1 任何结论）**：
+> Sprint 1 的提交数在其报告口径下记 **8**（`done.md` §6），实测 `git rev-list --count c3c31eb..HEAD` = **9**
+> —— 第 9 个是 `ef6a485`（message 自述「前次受 commit 硬上限阻塞」）。Sprint 1 的全部结论仍以其证据
+> revision `a3cdfb1` 为准，本项只影响跨 Sprint 统计（详见 `docs/sprint-2/plan.md` OQ0）。
+
+**Sprint 2 = B. 宿主平价（host parity：无 pwsh 宿主一等公民）→ `status: planning`（2026-09-22 起）**。
+目标：把 kixpower 的**信任链与维护链从 `pwsh` 依赖中解放**。范围 = 三块（全部要做）：
+
+| 块 | 交付 | 判据 |
+|---|---|---|
+| **P0** | trust-chain Node 化：`kixpower-contract`(517 行) / `validate-memory-backlog`(89) / `verification-fidelity-check`(320) | 三个 `.cjs` 在无 pwsh 宿主可执行；characterization 门禁绿；**有 pwsh 时**与 `.ps1` 差分逐字节一致 |
+| **P1** | 清 DSH 面向副本 `agents/*.agent.md` 的 10 个 pwsh hooks 死引用 | DSH 面 `^hooks:` = 0、`.ps1` 调用 = 0；**`hooks/*.ps1` 文件保留**（Copilot 路径仍在用） |
+| **P2** | `scripts/sync-dsh-preset.ps1`(197) Node 化 | `npm run test:installer` 本机 **25 → 25 pass / 0 fail / 0 skip**（现 `20/0/5`） |
+
+**Sprint 2 的核心风险（已正面处理，不绕过）**：本机无 pwsh ⇒ 移植无法与原版差分对拍，「忠实移植」的证据强度**天然受限**。
+处置 = 三条腿的等价性取证方案（差分对拍 `PASS|FAIL|unavailable` 三态 / characterization 固定用例 / 冻结凭据复算）
++ **一次性 `brew install powershell` 仅作 dev-time oracle（verification-only）**，边界由 `MG1` 机械判定
+（产品 `.cjs` 零 `pwsh` 引用、parity 不挂 `npm test` 链）。见 `docs/sprint-2/plan.md` §7.3 / §7.4。
+
 **下一步（按优先级）**：
 
-1. **CI 取证（唯一解锁 `release_eligible` 的动作）**：用户授权 PR 路径后，按 CG1 → CG2 → CG3 依次执行；
+1. **CI 取证（唯一解锁 `release_eligible` 的动作，且跨 Sprint 持续）**：用户授权 PR 路径后，按 CG1 → CG2 → CG3 依次执行；
    CG2 必须核对 **6 个 matrix 组合** 与 macOS job 日志中的 `# skipped 0`。若任一组合 failure
-   → 本 Sprint 的 `done` 判定失效（falsifier 见 `done.md` §8.3），走 `REVERIFY_REQUIRED`。
-2. **Sprint 2 候选输入**（本 Sprint 已登记、未修）：
-   - F-1 / HB-4：T2 幂等断言的 **hermetic 性**（把 mtime 边界构造进 fixture）——削弱 CI 侧证据强度；
-   - OQ8 / N8：`preset-classic` / `preset-null` 两副本**不被任何 npm script 执行**（字节一致 ≠ 可运行）；
-   - R-1 / HB-5：manifest digest 的平台无关复算（现依赖 pwsh，QA 未能字节级复核）；
+   → Sprint 1 的 `done` 判定失效（falsifier 见 `done.md` §8.3），走 `REVERIFY_REQUIRED`。
+   Sprint 2 的 CG2 判据在此基础上增加「installer 段 `# skipped 0`」（P2 后 5 条 pwsh 用例已改为真跑）。
+2. **Sprint 2 执行的必读输入**：`docs/sprint-2/{plan,progress,runtime-context,drift-check}.md`；
+   其中 `runtime-context.md` §1.2 的 **`pwsh` 双重语义**（PowerShell 二进制依赖 vs DSH 宿主工具名，
+   后者见 `kix-guards.js:1117`）是 P1 最容易误判的一点。
+3. **Sprint 2 明确不做（已登记去向）**：
+   - F-1 / HB-4：T2 幂等断言的 **hermetic 性**（把 mtime 边界构造进 fixture）→ Sprint 2 §10-N3；
+   - OQ8 / U-4：`preset-classic` / `preset-null` 两副本**不被任何 npm script 执行**（字节一致 ≠ 可运行）→ §10-N4；
    - F-2：`kix-focus.test.js:703-709` 近恒真弱断言改为显式 `skip` 语义；
-   - OQ4 / N5：baseline 对齐（上游 `main` 已领先本地，含 `v1.3.17` 的 CI failure run）；
-   - OQ6 / N2：pwsh 依赖工具链的 Node 等价实现（fidelity check / hooks）。
-3. **Sprint 2 规划期必读**：`docs/sprint-1/plan.md` §10（N1–N9 候选）、`docs/sprint-1/done.md` §9（11 项移交）、
-   `docs/sprint-1/hill-climbing.md`（L4：HB-3/4/5 candidate + U-1..U-5）。
+   - OQ4 / R3 / N5：baseline 对齐（上游 `main` 已领先本地，含 `v1.3.17` 的 CI failure run）→ §10-N5；
+   - **新发现**：`skills/kixpower/scripts/*.ps1` 三副本**无守护且已漂移**（源 517 行 vs 两副本 507 行，
+     `test:consistency` 仍 OK）→ Sprint 2 §10-N1；其余 49 个 `.ps1` / ~11,841 行的 Node 化 → Sprint 2 §10-N2。
+
+> **追加（2026-09-22，Sprint 2 增量重规划；不改写上文任何结论）**：
+>
+> **触发**：① 用户决策 **方案 B —— 单一引擎：hooks 与 trust-chain 统一用 Node**（否决「继续依赖 pwsh」与「bash/sh 双份实现」）；
+> ② 新发现缺陷 **D-1**：两个 installer 的占位符契约**为空且失败不报错**（macOS/Linux 装完 Copilot 后 hooks 指向不存在的
+> `pwsh` → **永不触发**，而安装器全程报成功；Windows 因硬编码恰好正确而不可见）。
+>
+> **范围变更（P1′）**：原 P1 只清「DSH 面向副本的死 hooks 块」，现**补一条反向的洞**——Copilot 面上的 hooks **语法存在、运行不存在**。
+> 新增 4 个任务（`docs/sprint-2/plan.md` §13）：
+>
+> | 任务 | 内容 | 关键判据 |
+> |---|---|---|
+> | **T6（H-A）** | 单一 hook 引擎：`hooks/lib/kix-verdict.cjs`（payload 双 schema 归一化 + 从 `kix-guards.js __internals` **逐字抽取**的判定层）+ 4 个 Node 入口 | LG15：负向控制 + mutation probe（改坏 core ⇒ 必红）+ 同源函数体断言 |
+> | **T7（H-B）** | 接线统一 `node "{{COPILOT_HOME}}/skills/kixpower/hooks/<name>.cjs"`；两个 installer **fail-closed** + 删除 `{{HOOK_LAUNCHER}}`/`{{HOOK_EXT}}` 层 | LG16（正/负双向）+ MG8：**装完残留 `{{` 即非零退出** |
+> | **T8（H-C）** | 覆盖裁决留痕：本 Sprint 做 **H-set-A = 4 个 deny 类 hook**（blast-radius / block-source-edit / -qa / block-dev-authority-edit）；其余 **6 个登记 Sprint 3**（判据逐条） | `hooks-coverage:` 行（MG9） |
+> | **T9（H-D）** | `hooks/*.ps1`（30 文件）：**保留 + 标记 deprecated**，不删除（可回滚性 100%；它们是 Sprint 3 的参照实现） | MG10 反向控制：`ls skills/kixpower/hooks/*.ps1 \| wc -l` = 10 |
+>
+> **预算口径**：绑定 `derived_commit_budget = 6`（**公式值 9 被环境硬约束否决**：kix-guards 1 小时窗口 / 10 commit 硬上限（含 amend），
+> 已用 `affc9c7`；用户指令 ≤6）→ **每 DAG 层合并 1 个 commit** 为硬要求；预计 5（C1 已提交 + 规划 + 2 个执行层 + 收尾）。
+> **等价性取证 v2**：pwsh 被永久否决 ⇒ E1 差分对拍移交 **CI（CG4）**，本地永久 `unavailable`（LG10 移出 required，否则 L2 结构性不可达）；
+> 证据锚点改为**既有 JS 测试网**（`kix-guards.test.js` 696 行 / 159 断言）+ characterization + 负向控制；
+> **禁止**把「characterization 绿」写成「与原 `.ps1` 等价」。细节见 `docs/sprint-2/plan.md` §12 / §16.2。
 
 ## 9. 风险登记（固定锚点）
 
@@ -250,6 +295,34 @@ en/preset-classic-en/ ──npm───▶ kixparadigm-classic-en
 | Markdown 链接 | `dsh/preset`、`en/preset-classic-en` 内相对链接可达 | `checkMarkdownLinks` | 断链 → 红 |
 | 语法 | 全部 JS/CJS/MJS 可解析 | `checkSyntax` | 同上 |
 
+> **Sprint 2 规划期的修订（追加，不改写上表既有行）**：上表有**两处覆盖缺口**，由 Sprint 2 的 T4 部分修复。
+>
+> | # | 缺口 | 证据 | Sprint 2 处置 |
+> |---|---|---|---|
+> | G-1 | **`skills/**` 不在任何检查面内**：`consistency-lib.cjs:681-699` 的检查面只有 plugins / `install-lib.js` / vision-bridge / persona 预算 / 链接 / 语法 | `skills/kixpower/scripts/kixpower-contract.ps1` = **517 行**，两个 preset 副本各 **507 行**，同 revision 上 `npm run test:consistency` 仍 `CONSISTENCY OK` | 已存在的 `.ps1` 漂移**不修**（§8 第 3 条第 5 项）；**新增的 `.cjs` 三副本组必须显式登记** `checkIdenticalSet`，否则复现同一漂移 |
+> | G-2 | **`checkSyntax` 的 symlink 盲区**：`walk()`（`consistency-lib.cjs:26-34`）用 `entry.isDirectory()`，**不跟随符号链接** → `checkSyntax({rel:'dsh/preset'})` **走不到** `dsh/preset/skills/**`（该目录是指向 `../preset-classic/skills` 的 symlink） | `ls -la dsh/preset/` 实读；`consistency-lib.cjs:589-601`、`:695-699` | T4 步骤 B 补 `checkSyntax({root, rel:'dsh/preset-classic'})`（机械改动，判据 = `CONSISTENCY OK` 输出中出现 `dsh/preset-classic: N JS/CJS/MJS syntax OK`） |
+>
+> **Sprint 2 新增的镜像组（需登记，否则等于新增一类未守护副本）**：
+> `skills/kixpower/scripts/{kixpower-contract,validate-memory-backlog,verification-fidelity-check}.cjs` 与
+> `skills/kixpower/tests/{trust-chain,ps1-parity}.test.js`，各 **3 副本**（`skills/kixpower/` = 源、
+> `dsh/preset-classic/skills/kixpower/`、`en/preset-classic-en/skills/kixpower/`；`dsh/preset/skills` 经 symlink 共享 classic 根）。
+> `scripts/sync-dsh-preset.cjs` 为**单副本**（无镜像要求，仅 `checkSyntax({rel:'scripts'})` 覆盖）。
+
+> **Sprint 2 增量重规划期的第二次修订（追加，不改写上表与其他追加段）**：新增 **hooks 面**的副本组与一条**发行面语义**。
+>
+> | 副本集 | 成员 | 守护检查 | 后果 |
+> |---|---|---|---|
+> | **hooks 引擎（3 副本）** | `skills/kixpower/hooks/lib/kix-verdict.cjs`、`hooks/{blast-radius-check,block-source-edit,block-source-edit-qa,block-dev-authority-edit}.cjs`、`hooks/README.md`、`tests/hook-engine.test.js` | `checkIdenticalSet`（**T4 登记**；T4 是 `consistency-lib.cjs` 的唯一写入者） | 任一副本漂移 → `test:consistency` 红 |
+> | **hooks `.ps1`（既有，未守护）** | `skills/kixpower/hooks/*.ps1`（10 × 3 副本 = 30 文件） | **无**（`skills/**` 不在检查面内，见 G-1） | **已漂移**：`blast-radius-check.ps1` 源 556 行 vs 两副本 444 行；本 Sprint 只登记 → `plan.md` OQ10 / N8 |
+> | **单副本（无 identity group）** | `install.sh`、`install.ps1`（`en/` **无** installer）、`scripts/sync-dsh-preset.cjs`、`scripts/copilot-installer.test.js`、`.github/workflows/ci.yml` | 无（仅 `checkSyntax` / 测试自身） | 改动无镜像义务；但 `install.ps1` 本地无 pwsh → 可执行验证只能走 CI（CG5） |
+>
+> **发行面语义（新增，plan §13.1 的判定依据）**：**`skills/**` 是两个发行面的唯一交集** ——
+> Copilot 安装只复制 `skills/**` + `agents/**`（`install.sh:163-172`，**不装 `dsh/**`**）；
+> 而 DSH 的 `dsh/preset-null/` **没有 `skills/`** 兄弟目录。推论（可机械复核）：
+> 1. **跨发行面共享的代码必须落在 `skills/**`**（否则 Copilot 面 `MODULE_NOT_FOUND`）；
+> 2. **`kix-guards.js`（`dsh/**/plugins/`）不得 require `skills/**`**（否则 `preset-null` 插件装载失败）；
+> 3. 因此本 Sprint 的 hook 引擎采用「**单一 core（skills 面）+ 双侧同源断言**」，而**不是**跨面 `require`。
+
 **改动纪律**：任何 `dsh/**` 或 `en/**` 源码改动**必须**同步其副本组；`scripts/install-lib.js` 必须同步 `en/scripts/install-lib.js`。
 **Sprint 1 实际改动面**（`git diff --name-only c3c31eb..HEAD` 共 18 文件）：`scripts/**`、`en/scripts/install-lib.js`（镜像）、
 `.github/workflows/ci.yml`、`CHANGELOG.md`、4 个 `**/plugins/kix-focus.test.js`（**测试夹具**，经 plan §2 修订授权）与规划/收尾文档；
@@ -265,6 +338,15 @@ en/preset-classic-en/ ──npm───▶ kixparadigm-classic-en
 | `gh` 已认证（账号 `slchris`），但**上游 Issues 禁用** | 只能读 CI run/PR；不能提 Issue |
 | fork `slchris/kixparadigm` 无 workflow 注册、无 run 历史 | 本地 push 不触发 CI；CI 只在上游 PR/push 触发 |
 | 无 env / DB / 服务 / 端口 | 模板的「环境变量 / DB schema / health endpoint」三节对本项目**不适用**，已在本 Sprint 的 `runtime-context.md` 改为「工具链能力快照」|
+
+> **Sprint 2 追加（2026-09-22）**：上表「本机无 `pwsh`」在 Sprint 2 **从「限制」升为「Sprint 目标」**——
+> 要消除的是**运行依赖**，不是绕过环境差异。两条新事实：
+> 1. **`pwsh` 在 DSH 上有双重语义**：`kix-guards.js:1117` `TERMINAL_TOOLS = new Set(['pwsh','bash'])` →
+>    `pwsh` 也是**合法宿主工具名**。它与「PowerShell 二进制依赖」是两件事，判据必须分开（不得用裸 `grep -c pwsh`）。
+> 2. **dev-time oracle 通道存在**：`brew info powershell` = formula **7.6.6 (bottled, `Required (1): dotnet`)**；
+>    `brew info --cask powershell` = **Cask 不存在**（必须走 formula）。Sprint 2 **采纳**「一次性安装 pwsh 仅作验证工具」
+>    （**verification-only**，产品代码零 `pwsh` 引用，由 `plan.md` MG1 机械判定）；失败/被拒时 LG10 记 `unavailable`，
+>    **不计入通过**并走降级路径（见 `docs/sprint-2/plan.md` §7.3 / §7.4）。
 
 ## 13. 决策记录（已有但未文档化的决策）
 

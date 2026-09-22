@@ -218,6 +218,60 @@
     supersedes: []
     unmatched_runs: 0
     archive_after_unmatched: null
+
+- id: HB-7
+  type: tooling
+  status: candidate
+  problem: >-
+    安装器 / 同步脚本里的「批量替换」与「批量 chmod」步骤**无条件成功**：install.sh 对已安装的
+    agents/*.agent.md 执行 `{{HOOK_LAUNCHER}}`/`{{HOOK_EXT}}` 的 sed 替换，但这两个占位符**在任何源文件中
+    都不存在**（全仓 grep 只命中 installer 自己的 8 行：注释行与替换行），替换后仍无条件打印
+    `ok "Replaced placeholders in agent.md files"`；同文件对 0 个 `.sh` 执行 `chmod +x` 后也打印
+    `ok "chmod +x on .sh hooks/scripts"`。净效果：macOS/Linux 装完 Copilot 后 agent hooks 指向不存在的
+    `pwsh` → **hooks 永不触发**，而安装器全程报成功；Windows 因硬编码恰好正确而**看不见**该缺陷。
+    这是「声明存在、执行不存在」的静默失效（silent failure），比显式报错更难被发现。
+  improvement: >-
+    安装器 / 迁移脚本中的每个批量步骤（占位符展开、批量替换、批量 chmod、批量迁移）必须满足三条：
+    ① **先计数再操作**：作用域内匹配数为 0 时输出 `skip`（含计数），**禁止**打印 `ok`；
+    ② **替换后 fail-closed**：对残留模式（如 `{{...}}`）扫描，命中即打印机器可识别错误行
+    （`KIX-INSTALLER-RESIDUE: <file>:<line>`）并**非零退出**，且该分支之后不得再有成功播报；
+    ③ **双向可重放测试**：正向（装到临时目标 → 0 残留 + exit 0）+ 负向（向 fixture 注入哨兵占位符 →
+    必须 exit ≠ 0）。只有正向的测试无法证明「残留 ⇒ 失败」，只有负向的测试无法证明「正常路径不受影响」。
+    附则：跨平台契约（占位符 / launcher / 扩展名）必须在**所有**平台上由同一份源表达；
+    「某平台不报错」不构成契约成立的证据（本例中 Windows 恰好正确掩盖了缺陷）。
+  source: >-
+    Sprint 2 增量重规划期：orchestrator 实测 + Producer 逐行复核（2026-09-22）：
+    install.sh:20-21,228-229（占位符的注释与替换行）与 155-156（dry-run 播报）、222-234（无条件 ok）、236-240（空作用域 chmod）；
+    install.ps1:19-20,223-224、141-142、217-228；
+    `grep -rn "HOOK_LAUNCHER\|HOOK_EXT"`（排除规划文档自身的引用）= 8 行且全在 installer 内；
+    `grep -o '{{[A-Z_]*}}' agents/*.agent.md | sort | uniq -c` = 仅 `{{COPILOT_HOME}}` 21 处；
+    `ls skills/kixpower/hooks/*.sh` = 不存在（10 个 `.ps1`）。
+  evidence:
+    - task: "Sprint 2"
+      kind: origin
+      result: observed
+  archive_reason: null
+  eval:
+    task_kinds: [sprint, review]
+    trigger: "plan.md 目标或 diff 中出现『批量替换 / 批量 chmod / 占位符展开 / 迁移脚本 / 安装器步骤』的新增或修改"
+    pass_criteria: >-
+      ① 每个受影响的批量步骤都有「0 命中 → skip（带计数）」的分支，源码中不存在「无条件 ok/成功播报」；
+      ② 存在残留模式的 fail-closed 分支（非零退出 + 机器可识别错误行）；
+      ③ 测试同时包含正向与负向用例，且负向用例真的会让进程非零退出
+         （评审时可用「注释掉 fail-closed 分支 → 负向用例必须红」验证）；
+      ④ 判据跨平台同源：不在某一平台用硬编码绕过占位符/launcher 抽象。
+    regression_signal: >-
+      diff 中出现「批量操作 + 无条件成功播报」，或「占位符/launcher 只在单一平台成立」；
+      或出现「安装/同步报成功但目标功能不存在」的用户可见缺陷（本次 D-1 即此类）。
+    applies_to_sprints: ">=3"
+    check_timing: "both"
+    overlaps_with: [HB-1, HB-2]
+    supersedes: []
+    unmatched_runs: 0
+    archive_after_unmatched: null
+  note: >-
+    本项 origin 即 Sprint 2（T7 正是其对策：INV-H1 残留 fail-closed、INV-H3 空作用域 skip、
+    LG16 双向用例、MG8 grep 面），同一 Sprint 不能自证 → applies_to_sprints 从 ">=3" 起，Sprint 2 不计 unmatched。
 ```
 
 ## 应用记录
@@ -227,11 +281,14 @@
 | 1 | — | 本 Sprint 规划期创建 HB-1 / HB-2（均为 candidate），不作为 trial 应用（origin == 潜在 trial，自我确证无效）| not triggered |
 | 1 | HB-3 / HB-4 / HB-5 | L4 收尾期新增（均为 candidate）：HB-3 origin = L2 前链尾红暴露；HB-4 origin = QA 受控 A/B 反证；HB-5 origin = QA 残余不确定 R-1 | not triggered（origin == Sprint 1）|
 | 1 | HB-6 | 收尾对账期新增（candidate）：origin = blast-radius 结算提醒触发的 over_budget 对账（8 vs 7，over 量 == 收尾层）| not triggered（origin == Sprint 1）|
+| 2 | HB-1 / HB-3 / HB-4 / HB-5 / HB-6 | 规划期首次独立匹配（`applies_to_sprints: ">=2"`）→ **5 项 scoped trial**（落实位置见 `docs/sprint-2/plan.md` §11 / §19）| trial 进行中，**待 QA 判定**（`not triggered` ≠ pass；trial pass ≠ 晋升 validated）|
+| 2 | HB-2 | 规划期基线为绿（`test:installer` exit 0、`test:consistency` exit 0）→ trigger 不匹配 | not triggered（**不得记为 pass**）|
+| 2 | HB-7 | 增量重规划期新增（candidate）：origin = installer 占位符契约空洞 + 无条件成功播报（D-1）| not triggered（origin == Sprint 2，自我确证无效；`applies_to_sprints: ">=3"`）|
 
 ## 统计
 
 ```yaml
-items_total: 6
-by_status: {candidate: 6, validated: 0, archived: 0}
-by_type: {dev-workflow: 1, plan-template: 3, qa-workflow: 1, tooling: 1}
+items_total: 7
+by_status: {candidate: 7, validated: 0, archived: 0}
+by_type: {dev-workflow: 1, plan-template: 3, qa-workflow: 1, tooling: 2}
 ```
