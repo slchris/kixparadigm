@@ -14,9 +14,10 @@ updated: 2026-09-22
 > 每次阶段过渡由 Producer 更新。易变数字不双源维护：版本史看 `CHANGELOG.md`，机制映射看
 > `dsh/preset-classic/DSH-ADAPTATION.md`。
 >
-> **本 Sprint 起点**：Sprint 2（B. 宿主平价：无 pwsh 宿主一等公民），baseline = `ef6a48550a40bf433555790419fd4c2fd0cf1483`。
-> 上一 Sprint（Sprint 1，模式 0：已有代码项目导入）baseline = `c3c31eb3268622358761cb2035ec84810a12ca11`，终态见第 7 章。
-> Sprint 2 的计划/进度/环境快照见 `docs/sprint-2/`。
+> **本 Sprint 起点**：Sprint 3（A. 发布解锁：release unlock —— 把 `release_eligible: false` 变成有证据支撑的判定），baseline = `5c4d9aba59a584c64199510245dbc1724f310fb0`。
+> 上一 Sprint（Sprint 2，B. 宿主平价：无 pwsh 宿主一等公民）baseline = `ef6a48550a40bf433555790419fd4c2fd0cf1483`，终态见第 7 章。
+> 更早（Sprint 1，模式 0：已有代码项目导入）baseline = `c3c31eb3268622358761cb2035ec84810a12ca11`。
+> Sprint 3 的计划/进度/环境快照/漂移检查见 `docs/sprint-3/`；Sprint 2 见 `docs/sprint-2/`。
 
 ---
 
@@ -261,6 +262,26 @@ en/preset-classic-en/ ──npm───▶ kixparadigm-classic-en
 4. **真实宿主语义取证**（OQ8 spawn 失败 = `deny`/`ignore`；OQ9 真实载荷 schema）——决定 F-4 定级与那 6 条声明的行为。
 5. **F-3 / F-4 / F-5 / F-6 的修法**（全部属**产品码** ⇒ 需新 revision + QA 重签）：installer 作用域收窄 + 原子性 · `TOOL_LIKE_KEY` 补 `arguments`/`parameters`/`function` · `hooks/README.md` 入镜像组 · 判据强度（marker 不得复用成功路径文案）。
 6. **HB-8..HB-13** 六项 candidate（维护调用点检索面 / 结论与证据同源 / installer 作用域 / 未知形态敞口 / 文档类三面守护 / 判据强度）+ 已晋升 `validated` 的 **HB-1/3/4/5** 作为既定实践应用并监测回归。
+
+### Sprint 3 规划（2026-09-22）→ `status: planning`
+
+> 计划/进度/环境快照/漂移检查：`docs/sprint-3/{plan,progress,runtime-context,drift-check}.md`。
+> baseline = `5c4d9aba59a584c64199510245dbc1724f310fb0`（= Sprint 2 终态 HEAD）；`derived_commit_budget: 6`。
+
+- **用户范围决策（不得扩张）**：在被给出四个选项后**明确选定 A** —— 「先解锁发布：installer 非交互健壮性 + CI 取证」，并**授权 push 到 fork + 开 PR**。
+  **明确未选** H-set-B（6 个 hook 移植）与「DSH 插件为主路径」的重定位 ⇒ 本 Sprint **不含 hook 移植**，只在 `plan.md` §11 登记为 Sprint 4 主候选。
+- **主题**：把 `release_eligible: false` 变成**有证据支撑的判定**（判据表 = C1..C6，全部绑定同一最终 HEAD）。
+- **CI 通道已打通（Sprint 1 的阻塞点终结）**：push 后 workflow `ci` 自动注册为 `active`；run `35729103867`（push）/ `35729139524`（PR）已产出，PR **#1** 已开。
+- **规划期只读取证的两处结论修正**（`docs/sprint-3/progress.md` §3）：① `windows × 2` job **`failure`**（`scripts/sync-dsh-preset.cjs:129-132` 的 `isInside` 大小写不对称 ⇒ 代码失败）⇒ 原「条件任务」变**必做 P0**；
+  ② parity step 在 **ubuntu/macOS `success`** 且状态行 `parity: PASS`（oracle `7.6.6`/`7.6.5`）⇒ Sprint 2 的「LG10 本地永久 unavailable」获得 CI 载体实证；**Windows 侧 parity 从未执行**（step 被 skip）⇒ 登记为平台盲区。
+- **任务**：T1 `install.sh` 非交互（`--yes` + 非 TTY fail-closed + `KIX-INSTALLER-CONFIRM-REQUIRED` + exit 3）· T2 `install.ps1` 对称（`-Yes`）· T3 CI 取证登记 · T4 CI 红修复（大小写对称 + 单侧归一化审计）·
+  T5 CI 载体补齐（installer 无人值守验证，CG5）· T6 收尾 + `release_eligible` 重判。
+- **`>20% → 强制扩展 target_rules` 规则的处置**：规划期以可判定窗口（`--prev-sprint 2`，baseline `ef6a485`）复跑 ⇒ `ungated: 0 (0%)` / `PASS` ⇒ **未触发**（逐字输出见 `drift-check.md` §5）。
+  Sprint 2 的 `23.4%` / `27.8%` 是 `--prev-sprint 1` 窗口读数，**窗口不同不得互相引用**；执行期由 LG6 同窗口复跑确认。
+- **本 Sprint 不做**：H-set-B hook 移植、DSH 插件主路径重定位、F-3..F-6、HB-8..HB-13（仅登记）、发布/合并上游 PR/打 tag。
+
+**下一步（进入 Sprint 4 时的优先级）**：① **N12 = H-set-B 6 个 hook 移植**（用户未选但为下一主候选；`validate-qa-signoff` + `qa-freshness-check` + `cleanup-qa-session` 必须同批）；
+② 若 Sprint 3 的 CG 仍有平台盲区/未执行项 ⇒ 补通道；③ F-3/F-4/F-5/F-6（产品码，需新 revision + 重签，F-4 须与真实载荷采样同批）；④ HB-8..HB-13 六项 candidate；⑤ OQ8/OQ9 真实宿主语义取证。
 
 ## 9. 风险登记（固定锚点）
 
