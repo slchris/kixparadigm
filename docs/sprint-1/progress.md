@@ -2,14 +2,15 @@
 sprint: 1
 status: in-progress
 last_updated: 2026-09-22
-completed_tasks: 0
+completed_tasks: 2
 total_tasks: 5
 blocked_tasks: 0
 open_issues: {P0: 0, P1: 0, P2: 0}      # 上游 Issues 已禁用（hasIssuesEnabled: false），缺陷只登记在本文件与 plan.md
 artifacts_changed_since_last_observe: []
 observe_fingerprint: c3c31eb3268622358761cb2035ec84810a12ca11   # 规划期 = baseline；每次 Dev 分派前由 orchestrator 刷新
 sprint_baseline_sha: c3c31eb3268622358761cb2035ec84810a12ca11   # 首次 Dev 前的 HEAD（完整 40 位）
-dev_self_tests_passed: []
+dev_self_tests_passed:
+  - "test:installer @ T1+T4 — 25 tests / 19 pass / 1 fail / 5 skip（本机无 pwsh；剩余 1 fail 为 T2 幂等红，T2 修复后应转 20/0/5）"
 l2_verification_passed: []
 l2_verified_sha: null                    # placeholder — orchestrator 在 L2 完成后写入完整 40 位 SHA
 l2_gate_manifest_sha256: null            # placeholder — plan 中全部 required local_gate 规范化 manifest 的 SHA-256
@@ -37,13 +38,13 @@ blast_radius:
 
 | ID | 任务 | 状态 | 依赖 | 说明 |
 |---|---|---|---|---|
-| T1 | `sync-dsh-preset.test.js` 82/110/140 补统一 pwsh ENOENT 探针（3 条 fail → skip）| [ ] | — | 保留负向断言；两类 skip 语义可区分 |
+| T1 | `sync-dsh-preset.test.js` 82/110/140 补统一 pwsh ENOENT 探针（3 条 fail → skip）| [x] | — | 保留负向断言；两类 skip 语义可区分 |
 | T2 | `ensureDefaultSkillsShelf` 幂等：**先取证**（added/updated/same/pruned）再修最窄一层；同步 en 字节镜像 | [ ] | — | 未产出 `T2-evidence` 行不得改代码（MG3）|
 | T3 | CI matrix 增加 `macos-latest` | [ ] | T1, T2 | macOS runner 亦预装 pwsh → 防的是 T2 而非 T1 |
-| T4 | 5 条 pwsh 依赖用例统一可识别 skip 文案（skipped 计数 ↔ 原因一一对应）| [ ] | T1 | 与 T1 同文件，串行 |
+| T4 | 5 条 pwsh 依赖用例统一可识别 skip 文案（skipped 计数 ↔ 原因一一对应）| [x] | T1 | 与 T1 同文件，串行 |
 | T5 | CHANGELOG 已反证声称追加平台限定/勘误（不改历史数字）| [ ] | T1–T4 | 需要最终门禁数字稳定后写 |
 
-**合计**：5 任务，0 完成，0 阻塞。
+**合计**：5 任务，2 完成，0 阻塞。
 
 ## 基线证据（规划期，只读复核）
 
