@@ -2,7 +2,7 @@
 sprint: 2
 status: in_progress
 last_updated: 2026-09-22
-completed_tasks: 5
+completed_tasks: 9
 total_tasks: 9                          # T1..T5（plan.md §4）+ T6..T9 = H-A..H-D（§13，2026-09-22 增量重规划追加）；HB-6 scoped trial 的收尾层由 task_sizing_v2.closeout_layer 承载，不占 task 位
 blocked_tasks: 0
 open_issues: {P0: 0, P1: 0, P2: 0}      # 上游仓库 Issues 已禁用（hasIssuesEnabled: false）→ 缺陷只登记在本文件与 plan.md
@@ -28,7 +28,15 @@ artifacts_changed_since_last_observe:
   - skills/kixpower/tests/hook-engine.test.js（+2 preset 副本；LG15）
   - .github/workflows/ci.yml（T6 步骤 D：E1 三态独立 step）
   - docs/sprint-2/drift-check.md（T3 首次真实运行输出追加）
-observe_fingerprint: 1479a35   # 本层开工时的 HEAD（规划文档提交；层 2 commit sha 见下 Trace Log）
+  # ── 层 3 已提交（T4 + T7 + T8 + T9，见下 Trace Log `dev_layer3`）──
+  - scripts/sync-dsh-preset.cjs（单副本，T4 收口）、scripts/sync-dsh-preset.test.js（Node 化，5 skip → 0）
+  - scripts/copilot-installer.test.js（**新增**，LG16 双向证据网）
+  - dsh/preset/plugins/consistency-lib.cjs（+3 副本：11 组三面镜像登记 + `dsh/preset-classic` 语法盲区修复）
+  - install.sh / install.ps1（占位符层删除 + KIX-INSTALLER-NO-NODE / KIX-INSTALLER-RESIDUE + 空作用域 skip）
+  - package.json（仅 `test:installer` 参数 += copilot-installer.test.js）
+  - agents/*.agent.md ×5（10 处 H-set-A 命令 → node；6 条 H-set-B 追加宿主能力条件注记）
+  - skills/kixpower/hooks/README.md（+2 副本；宿主状态台账 / promotion 判据 / deprecated 声明）
+observe_fingerprint: 27fe7f6   # 本层开工时的 HEAD（层 2 提交；层 3 commit sha 见下 Trace Log）
 sprint_baseline_sha: ef6a48550a40bf433555790419fd4c2fd0cf1483   # 首次 Dev 前的 HEAD（完整 40 位）；Sprint 1 终态 rev（其 done.md 记 a3cdfb1 + 收尾补正 ef6a485，见 plan.md OQ0）
 dev_self_tests_passed:
   - "node --test skills/kixpower/tests/trust-chain.test.js @ T1 — 13 tests / 13 pass / 0 fail / 0 skip（LG9；E2 characterization + E3 冻结凭据复算）"
@@ -48,6 +56,13 @@ dev_self_tests_passed:
   - "npm run test:installer @ 层 2 — **25 tests / 20 pass / 0 fail / 5 skip**（T4 未完成，与规划期基线一致，无新增假绿）"
   - "npm run test:consistency @ 层 2 — exit 0（新增 hooks 面 3 副本字节一致组由 T4 登记；当前守护面不覆盖 skills/**，F5）"
   - "MG8 预核 @ T6 — `ls skills/kixpower/hooks/*.ps1 | wc -l` = 10（H-D 保留，T9 复核）；4 个 Node 入口 ×3 副本 md5 各 1 个取值"
+  # ── 层 3 实测（T4/T7/T8/T9）──
+  - "npm run test:installer @ 层 3 — **32 tests / 32 pass / 0 fail / 0 skip**（LG1：25 + N，N=7 实测回填；skip 由 5 归零）"
+  - "node --test scripts/copilot-installer.test.js @ T7 — **7 tests / 7 pass / 0 fail / 0 skip**（LG16 双向：正向 / residue / 空作用域 chmod / 低版本 node / 无 node / 两 installer 静态对称 / MG8 ②③）"
+  - "npm run test:consistency @ 层 3 — exit 0；新增 11 组「三面字节一致」登记（LG15 证据网与 4 个 hook 入口在内），并**修复语法盲区**：`dsh/preset-classic: 37 JS/CJS/MJS syntax OK`（此前只查 `dsh/preset`，symlink 不跟随 → classic 面无人守护）"
+  - "MG8 静态判据 @ T7 — `grep -c 'HOOK_LAUNCHER\|HOOK_EXT' install.sh install.ps1` = **0 / 0**（原 4 / 4）；`grep -c 'node \"{{COPILOT_HOME}}/skills/kixpower/hooks/' agents/*.agent.md` = **8 行 / 10 个声明 / 4 个 distinct hook**（producer 的 4 命令单行数组按 1 行计）"
+  - "MG10 静态判据 @ T8+T9 — 3 副本 `hooks/README.md` md5 一致（1 个取值）；`ls skills/kixpower/hooks/*.ps1 | wc -l` = **10**（未删除任何 `.ps1`；三面 30 文件零改动）"
+  - "install.sh 端到端 @ T7 — 真装进临时 `COPILOT_HOME`：exit 0、`grep -r '{{' <tmp>/agents` = 0 行、`skip: chmod +x (0 .sh files)`（无 ok 级 chmod 播报）；负向：注入 `{{KIX_RESIDUE_PROBE}}` → exit 1 + `KIX-INSTALLER-RESIDUE`；PATH 无 node / node v18.4.0 stub → exit 1 + `KIX-INSTALLER-NO-NODE`"
 l2_verification_passed: []              # placeholder — 仅 orchestrator 可写；本 Sprint 规划期尚未发生 L2
 l2_verified_sha: null                   # placeholder — 完整 40 位 SHA
 l2_gate_manifest_sha256: null           # placeholder — 规范化规则见 plan.md §7.2（HB-5 scoped trial 的交付）；**必需集合 v2 = 13 条（plan §16.5）**
@@ -85,17 +100,19 @@ blast_radius:
 | T1 | 等价性取证基座：`kixpower-contract.ps1`(517) → `.cjs` + parity/characterization 骨架 + `host_requires`/`unavailable` 语义 + oracle 决策落盘 | [x] | — | 契约模块被 T2/T3 直接消费（`validate-memory-backlog.ps1:11` / `verification-fidelity-check.ps1:17` 均 dot-source）|
 | T2 | `validate-memory-backlog.ps1`(89) → `.cjs` + 关闭 U-2 对拍 + `prompts/kixpower-new.prompt.md:80` 调用点改写 | [x] | T1 | 层 2 完成：LG12 实测 exit 0（`record_count: 7`）；`U2-parity:` 三方对照 = 与 Sprint 1 即兴移植**逐字节一致**（3 fixture）|
 | T3 | `verification-fidelity-check.ps1`(320) → `.cjs` + `USAGE_MANUAL.md:365` / producer agent 调用点改写 + 首次真实运行追加 `drift-check.md` | [x] | T1 | 层 2 完成：LG11 实测 exit 0（`ungated: 0 (0%)` → PASS，`baseline_degraded` 解除）；输出已追加到 `drift-check.md` §8 |
-| T4 | `scripts/sync-dsh-preset.ps1`(197) → `.cjs` + 5 条 pwsh 类 skip 归零（`test:installer` 25/0/5 → 25+N/0/0）+ **全部新增 `.cjs` 镜像登记（含 T6 的 15 个 hooks 文件）** + 修 `checkSyntax` symlink 盲区 | [~] | T1, T6 | WIP 311 行已存在；实测仍 **5 skip**（`sync-dsh-preset.test.js` 仍 spawn pwsh）；成为 `consistency-lib.cjs` 的唯一写入者（plan §14.1）|
+| T4 | `scripts/sync-dsh-preset.ps1`(197) → `.cjs` + 5 条 pwsh 类 skip 归零（`test:installer` 25/0/5 → 25+N/0/0）+ **全部新增 `.cjs` 镜像登记（含 T6 的 15 个 hooks 文件）** + 修 `checkSyntax` symlink 盲区 | [x] | T1, T6 | 层 3 完成：`test:installer` = **32 / 32 pass / 0 fail / 0 skip**（N=7 实测）；11 组三面镜像登记 + `dsh/preset-classic` 语法守护（37 文件）；`consistency-lib.cjs` 仍单写入者 |
 | T5 | P1：清 DSH 面向副本的 10 个死 `hooks:` 块（classic 5 + en 5）+ 收敛失效措辞 | [x] | — | **不删 `hooks/*.ps1`**；不动 root 的 Copilot 分发版（`agents/`）|
 | **T6** | **H-A 单一 hook 引擎**：`hooks/lib/kix-verdict.cjs`（payload 归一化 + 从 `kix-guards.js __internals` 逐字抽取的判定层）+ 4 个 Node 入口（各 3 副本）+ `hook-engine.test.js`（细粒度 + 负向控制 + mutation probe + 同源函数体断言）+ CI 侧 E1 step 与 parity 退出码修订 | [x] | T1 | 层 2 完成：LG15 = **44 tests / 44 pass / 0 fail / 0 skip**（含 mutation probe 自证红）；4 个 hook 入口 ×3 副本 md5 一致；`kix-guards.js` 4 副本**零改动** |
-| **T7** | **H-B 接线与失败关闭**：4 个 hook 命令统一 `node "{{COPILOT_HOME}}/.../<name>.cjs"`；两个 installer 删除 `HOOK_LAUNCHER`/`HOOK_EXT` 层 + INV-H1 残留 fail-closed + INV-H3 消除空作用域 `ok` + `copilot-installer.test.js`（正/负双向） | [ ] | T6 | 机械判据见 plan §16.4 第一行；`install.ps1` 本地无 pwsh → 可执行验证只能走 CG5（如实登记） |
-| **T8** | **H-C 覆盖裁决留痕**：`hooks/README.md`（3 副本：宿主状态表 + H-set-B promotion 判据 + deprecated 声明）+ 未移植 6 条 hook 的宿主能力条件注记（root agents **只追加**）+ 本文件 `hooks-coverage:` 行 | [ ] | T6 | 裁决已定：**H-set-A = 4 个（本 Sprint）/ H-set-B = 6 个（Sprint 3，判据逐条）**，见 plan §13.0 |
-| **T9** | **H-D `hooks/*.ps1` 去留**：**保留全部 30 文件 + 标记 deprecated**（不删除）+ 删除判据与可回滚性落盘 | [ ] | T6 | 理由 5 条见 plan §13.4；**不逐文件改 30 个 `.ps1`**（零编码风险）|
+| **T7** | **H-B 接线与失败关闭**：4 个 hook 命令统一 `node "{{COPILOT_HOME}}/.../<name>.cjs"`；两个 installer 删除 `HOOK_LAUNCHER`/`HOOK_EXT` 层 + INV-H1 残留 fail-closed + INV-H3 消除空作用域 `ok` + `copilot-installer.test.js`（正/负双向） | [x] | T6 | 层 3 完成：MG8 = 0/0 + 10 声明（4 distinct）；LG16 = 7/7（含 orchestrator 核验补充的 node 前置双向判据）；**`install.ps1` 本地无 pwsh → 仅静态判据，可执行验证走 CG5**（如实登记） |
+| **T8** | **H-C 覆盖裁决留痕**：`hooks/README.md`（3 副本：宿主状态表 + H-set-B promotion 判据 + deprecated 声明）+ 未移植 6 条 hook 的宿主能力条件注记（root agents **只追加**）+ 本文件 `hooks-coverage:` 行 | [x] | T6 | 层 3 完成：README 3 副本 md5 一致；10 处注记（**只追加**，声明数 10/10 与 frontmatter 解析未变）；`hooks-coverage:` = 10 行表（MG9） |
+| **T9** | **H-D `hooks/*.ps1` 去留**：**保留全部 30 文件 + 标记 deprecated**（不删除）+ 删除判据与可回滚性落盘 | [x] | T6 | 层 3 完成：`ls skills/kixpower/hooks/*.ps1 \| wc -l` = **10**（反向控制）；30 文件零改动；deprecated 声明落在 README §3 三层留痕之一 |
 
-**合计**：**9 任务，5 完成（T1/T5 = 层 1；T2/T3/T6 = 层 2），0 阻塞；1 进行中（T4 = WIP 已在工作区，未过 gate）；3 未开始（T7–T9 = H-B..H-D）**。
+**合计**：**9 任务，9 完成（T1/T5 = 层 1；T2/T3/T6 = 层 2；T4/T7/T8/T9 = 层 3），0 阻塞，0 未开始**。
+遗留项（非任务缺口，已逐条登记）：`install.ps1` 可执行验证归 CG5（本地无 pwsh）、`parity: unavailable` 退出码 2 的机制冲突（D-5）、真实 Copilot 载荷 schema 未取证（OQ9/OQ8）。
 
 **DAG v2 分层与提交映射**（plan §14/§15，**每 DAG 层合并 1 个 commit 是硬要求**）：
-`[T1,T5]` → C1 `affc9c7`（**已提交**）；`[T2,T3,T6]` → C3（**已提交**，sha 见 Trace Log `dev_layer2`）；`[T4,T7,T8,T9]` → C4；C2 = `1479a35` 增量规划文档；C5 = 收尾层。
+`[T1,T5]` → C1 `affc9c7`（**已提交**）；`[T2,T3,T6]` → C3 `27fe7f6`（**已提交**）；`[T4,T7,T8,T9]` → C4（**已提交**，sha 见 Trace Log `dev_layer3`）；C2 = `1479a35` 增量规划文档；C5 = 收尾层。
+**commit_budget 消耗**：6 中的 4（C1/C2/C3/C4）；C5 收尾层预留 1。
 **总预算 6（绑定值）= min(公式 9, 环境硬约束 1h/10-commit 与用户 ≤6 指令)；预计 5，余量 1。**
 
 > **T1 移交 T2/T3 的契约面**（消费者只需这些）：`frontmatter / yamlScalar / yamlList / inlineYamlList / indentedBlocks / planGateRecords / requiredLocalGates / gateManifestConflicts / gateManifestJson / sha256Hex / isSha`（plan.md §4-T1 步骤 A 清单；hooks 侧 helper 显式不移植）。
@@ -142,6 +159,7 @@ blast_radius:
 | **D-2** | hook 输入契约失真（旧 `tool_name` schema vs 真实 `toolCalls[]`） | **中高**（修复 D-1 后仍可能静默放行） | F14；`DSH-ADAPTATION.md:56` | 修复面 = **T6**（payload 归一化层 + LG15 的双 schema 用例）；取证 `OQ9` |
 | **D-3** | hooks 面未守护漂移（`blast-radius-check.ps1` 556 vs 444） | 中（canonical 归属不明 → 移植参照可能取错） | F15 | 本 Sprint 只登记（`OQ10`/`N8`）；取值 = **源的 556 行为 canonical** |
 | **D-4** | **`block-source-edit-qa.ps1` 的 git 写/提交分支在 `.ps1` 上失效**：该 hook `:53-54` 调用 `Test-KixGitCommitCommand` / `Test-KixGitWriteCommand`，二者在 `kixpower-contract.ps1` 中**嵌套定义于其他函数体内**（`:358/:368/:397`）→ hook 顶层作用域取不到 → 抛 `CommandNotFoundException` 后继续（默认 `ErrorActionPreference = Continue`）→ **QA 的 git 提交/写操作实际未被拦截**（`terminalWriteCommand` 因整条 `if` 条件语句异常也未生效） | 中（安全边界静默失效，与 D-1/D-2 同族） | `skills/kixpower/hooks/block-source-edit-qa.ps1:53-54` × `skills/kixpower/scripts/kixpower-contract.ps1:348/358/387`（嵌套）；`:407` 的 `Get-KixCommandSegments` 同样嵌套 | T6 的 Node 版**按意图生效**（QA 的 git 写/提交被 deny，LG15 有用例）；`.ps1` 侧**不改**（属 plan §2「不改 `.ps1`」边界）→ 差异写入 `hook-engine-evidence:` 的 `divergence` 与 core 文件头 |
+| **R-3** | **`install.ps1` 本机不可执行验证**：本地无 pwsh → 本层只能给静态判据（标记齐备 / 0 旧占位符 / 2 处 node 判定且晚于拷贝）；语义正确性（PS 版本解析、`-DryRun` 残留扫描、路径分隔符替换）**未在本机取证** | 中（改动面含 fail-closed 路径，若静态判据漏掉真实缺陷则等于没修） | LG16 ⑤ 静态用例 + 逐行实读 patch 区域（`:55-78/:248-289`） | 可执行验证 = **CG5**（CI windows-latest smoke：正常 0 + 注入哨兵非零）；本层**不**声称 ps1 侧等价，登记为残留不确定性 |
 | **D-5** | **`parity: unavailable` 的 `exit 2` 目标不可达**：plan §13.1 T6 步骤 D 要求三态退出码 0/1/2，但 `node --test <file>`（Node v22.14.0 实测）把测试子进程的任何失败归一化为 exit 1，`process.exit(2)` / `process.exitCode = 2` 两种写法均被抹平 | 低（不停工；三态语义已由状态行 + CI step 映射承载） | 见 `parity_exit_code:` 行的实测 | 已落地 CI step 内的 0/1/2 映射（CG4 可机械定档）；**字面达成需改 LG10 的 cmd（plan 侧决策）** → 待 orchestrator 裁决，Dev 不改 plan |
 
 ### WIP 归属（未提交工作 → 任务节点；**WIP 存在 ≠ 任务完成**）
@@ -238,6 +256,49 @@ blast_radius:
   value: LG11 = exit 0（`ungated: 0 (0%)` → PASS）；**首次真实运行**输出（`[Scope Rules]` + `[Verification Fidelity]` + `fidelity_v5:` YAML）已**追加**到 `docs/sprint-2/drift-check.md` §8（Sprint 1 手工 baseline 报告未改写）；调用点改写 3 处（USAGE_MANUAL + root/DSH producer agent）；三副本 md5 一致
 - tag: T6-evidence
   value: 入口 CLI 端到端实测：三形态载荷下 `blast-radius-check.cjs` 均 exit 2 + deny JSON；`block-source-edit.cjs --role orchestrator` 与 `--role producer` 判定不同（exit 2 vs 0）；未知形态载荷 → exit 2 + `KIX-HOOK-UNKNOWN-PAYLOAD`（stdout + stderr 双通道）；`kix-guards.js` 4 副本**零改动**（LG15 的同源断言即其守护）
+- tag: hooks-coverage
+  value: >-
+    **10 行表（MG9）：hook → 类别 → 本 Sprint 取值 → promotion 判据。** 台账全文 = `skills/kixpower/hooks/README.md`（3 副本 md5 一致）。
+    类别判据（plan §13.0，机械可复核）：L1 = 非 fail-open 的 deny 类且其缺失使「越界写/不可逆破坏」无门禁；L2 = 校验 L2/QA 信任链产物；L3 = remind/cleanup 级。
+    | hook | 类别 | 本 Sprint | promotion 判据（H-set-B，全部满足才开工） |
+    |---|---|---|---|
+    | `blast-radius-check` | L1 deny | **H-set-A（已移植）**：`blast-radius-check.cjs` | —（本 Sprint 完成） |
+    | `block-source-edit` | L1 deny | **H-set-A（已移植）**：`block-source-edit.cjs --role producer\|orchestrator` | — |
+    | `block-source-edit-qa` | L1 deny | **H-set-A（已移植）**：`block-source-edit-qa.cjs` | — |
+    | `block-dev-authority-edit` | L1 deny | **H-set-A（已移植）**：`block-dev-authority-edit.cjs` | — |
+    | `validate-handoff` | L2 trust | H-set-B（**未移植**，仍 `pwsh`） | Copilot 侧深度部分（worktree 登记 / `plan_snapshot_sha` / `l2_gate_manifest_sha256` / stash / reverify marker）仍在 release 判据中 |
+    | `validate-qa-signoff` | L2 trust | H-set-B（**未移植**，仍 `pwsh`） | 与 `qa-freshness-check` + `cleanup-qa-session` **同批**：① payload 归一化层通过 LG15；② `docs/.kixpower-qa-session.json` 机制仍在用（三者共享 marker 语义，分批 = 只写不读/只读不写） |
+    | `qa-freshness-check` | L2 trust（marker 写入侧） | H-set-B（**未移植**，仍 `pwsh`） | 同上（必须同批） |
+    | `cleanup-qa-session` | L3 cleanup | H-set-B（**未移植**，仍 `pwsh`） | 同上（必须同批） |
+    | `auto-update-progress` | L3 remind（fail-open） | H-set-B（**未移植**，仍 `pwsh`） | 出现 **≥2 次**「Dev 完成编辑但 `progress.md` 未同步」实例 |
+    | `pre-commit-lint-check` | L3 remind（fail-open，`:7` 自述） | H-set-B（**未移植**，仍 `pwsh`） | Copilot 侧 lint 覆盖成为 `release_eligible` 判据；或出现 **≥1 次**「提交未过 lint 且 CI 未拦」实例 |
+  counts: H-set-A = 4（1138 行源）/ H-set-B = 6（991 行源）= 10
+  not_claimed: 未移植的 6 条在**无 pwsh 宿主上不触发**（spawn 失败；`hook spawn 失败 = deny 还是 ignore` 未取证 → OQ8）⇒ **不是**已生效门禁，不得据此声称 L2/QA 信任链受保护
+- tag: installer-failclosed
+  value: >-
+    **双向实测（LG16 / MG8）**。① 正向：`install.sh` 真装进临时 `COPILOT_HOME`（`VSCODE_*` 全部重定向进临时目录，不碰用户真实 VS Code 面）→ exit 0、
+    `grep -r '{{' <tmp>/agents` = **0 行**、10 条 node 形式 hook 命令各自指向**安装目录内真实存在**的 `.cjs`、launcher `node` 可解析。
+    ② 负向-残留：把 `{{KIX_RESIDUE_PROBE}}` 注入 fixture 的一个 agent 文件 → exit **1** + `KIX-INSTALLER-RESIDUE` + 指出文件（且 dry-run 不落盘）。
+    ③ 空作用域：本 bundle 0 个 `.sh` → 输出 **`skip: chmod +x (0 .sh files)`**，且无任何 `ok` 级 chmod 播报（原实现无条件 `ok`）。
+    ④ 负向-node（orchestrator 核验补充 #2）：PATH 无 node → exit 1 + `KIX-INSTALLER-NO-NODE`；node v18.4.0 stub → 同；`--dry-run` 同样判定。
+    **MG8**：`grep -c 'HOOK_LAUNCHER\|HOOK_EXT' install.sh install.ps1` = **0 / 0**（原 4 / 4，含注释行同批清理）；
+    `grep -c 'node "{{COPILOT_HOME}}/skills/kixpower/hooks/' agents/*.agent.md` = **8 行**（producer 的 4 命令单行数组按 1 行计）= **10 个声明**（blast-radius ×5、block-dev-authority-edit ×2、block-source-edit ×2、block-source-edit-qa ×1）= **4 个 distinct hook**；每个 `<name>.cjs` 在 `skills/kixpower/hooks/` 下存在（LG16 用例内断言）。
+  limitation: **`install.ps1` 本地无 pwsh → 只做静态判据**（标记齐备 + 0 旧占位符 + 2 处 node 判定调用点且晚于拷贝）；可执行验证归 **CG5**（CI windows smoke + 注入哨兵）→ 残留不确定性如实登记，不记 pass。
+- tag: LG16-ext
+  value: >-
+    **对 plan §16 LG16 的口径扩展（Dev 主动登记，未擅自改 plan）**：plan 的 LG16 只写了 ①②③；
+    本层按 orchestrator 核验补充 #2 追加两条判据并写进 `scripts/copilot-installer.test.js`（因此 LG16 用例数 = 7 而非 3）：
+    **④ 宿主 node 缺失 / 版本 < 20.16 ⇒ exit ≠ 0 且含 `KIX-INSTALLER-NO-NODE`**（方案 B 把 `node` 变成 Copilot 侧 hook 与 trust-chain 的新硬前置，旧 installer 对 node 零探测 = LL-8 换了个二进制重演；判定在 pre-flight 与拷贝后各一次，`--dry-run` 同样生效）；
+    **⑤ 两个 installer 静态对称**（同一组失败关闭标记 + 旧占位符 token 0 命中 + 两次 node 判定调用点位置）——这是 `install.ps1` 在本机的**唯一**可验证通道。
+  needs: QA/L2 在 LG16 判定时按 5 条判据（非 plan 的 3 条）复核；若认为 ④⑤ 超出 T7 范围，按 §16 变更流程回退，不计入 Dev 自证。
+- tag: T4-evidence
+  value: `npm run test:installer` = **32 tests / 32 pass / 0 fail / 0 skip**（LG1 = 25 + N，N=7 实测）；`scripts/sync-dsh-preset.test.js` 5 条用例由「无 pwsh ⇒ SKIP」改为真跑（win32 2 条平台型 skip 保留）；`npm run test:consistency` exit 0 且新增 11 组三面镜像 + `dsh/preset-classic` 语法守护；ps1-parity 新增 2 条 sync fixture（dry-run in-sync / add-one），Node 半边已本机手工复核（空行 + 汇总行 + 单条 Added，exit 0）
+- tag: T7-evidence
+  value: 见 `installer-failclosed:`（LG16 双向 + MG8 两问）；调用面：root agents 10 处命令 → `node "<COPILOT_HOME>/skills/kixpower/hooks/<name>.cjs"`（orchestrator 保留 `--role orchestrator`）
+- tag: T8-evidence
+  value: `skills/kixpower/hooks/README.md` 3 副本 md5 = 1 个取值；含宿主状态表（10 行，逐行带 DSH 等价物行号）、H-set-B promotion 判据、`deprecated`（canonical `.cjs` / `.ps1` 参照实现）与「未移植 hook 在无 pwsh 宿主上不触发」的显式说明；root agents 追加 **10 处**宿主能力条件注记（只追加：命令、声明数 10/10、frontmatter 的 `---` 与 contract 解析器读出的 command 行数均未变）
+- tag: T9-evidence
+  value: 反向控制 `ls skills/kixpower/hooks/*.ps1 | wc -l` = **10**（三面 30 文件零改动，md5 与 HEAD 一致）；删除判据四条与可回滚性论证落在 README §3 与 plan §13.4
 - tag: T5-evidence
   value: grep -rn "^hooks:\|\.ps1" dsh/preset-classic/agents en/preset-classic-en/agents = 0 行；反向控制：root `agents/*.agent.md` 的 `^hooks:` = 5（Copilot 面未动）；`skills/kixpower/hooks/*.ps1` = 10 个文件仍在（未删文件本身）
 ```
@@ -340,6 +401,34 @@ blast_radius:
   findings:
     - "同源抽取器首版缺陷（常量初始化无括号时未收口 → 吞掉后续函数体）：已在生成脚本内修正并加断言，产物经 `node --check` + 逐字比对复核；**未进入任何 commit**"
     - "mutation probe 首版假绿：子进程继承父测试进程环境 → 孙进程 `node --test` 直接 0 退出；改最小环境后子套件 16 个 not ok"
+  l2_manifest: null
+- at: 2026-09-22
+  stage: dev_layer3
+  stage_signal: T4 + T7 + T8 + T9 完成（层 3 = DAG v2 第 3 层；每层 1 个 commit）
+  actor: kixpower-dev (Nova/Sage/Milo)
+  artifacts:
+    - scripts/sync-dsh-preset.cjs（T4 收口）+ scripts/sync-dsh-preset.test.js（Node 化：5 skip → 0）
+    - scripts/copilot-installer.test.js（新增；LG16 双向证据网）
+    - dsh/preset/plugins/consistency-lib.cjs（+3 副本：SPRINT2_NODE_ARTIFACTS 11 组三面镜像 + `dsh/preset-classic` 语法守护）
+    - install.sh、install.ps1（占位符层删除 + node 前置 + 残留 fail-closed + 空作用域 skip）
+    - package.json（仅 `test:installer` 参数）
+    - agents/*.agent.md ×5（H-set-A 10 处 → node；H-set-B 6 条 10 处宿主能力条件注记）
+    - skills/kixpower/hooks/README.md（+2 副本）
+    - skills/kixpower/tests/ps1-parity.test.js（+2 副本；T4 的 sync dry-run fixtures）
+    - docs/sprint-2/progress.md（本文件：任务表 + 追踪行 + 缺陷/风险）
+  gates:
+    - "LG1 = 32 tests / 32 pass / 0 fail / 0 skip（25 + N，N=7 实测）"
+    - "LG16 = 7 tests / 7 pass / 0 fail / 0 skip（双向 5 条判据，见 `LG16-ext:`）"
+    - "LG2 = exit 0（新增 11 组镜像登记 + 修复 classic 面语法盲区：37 文件）"
+    - "LG9 / LG11 / LG12 / LG15 复跑 = 全绿（层 2 不变）"
+    - "LG10 = unavailable（无 pwsh；E1 移交 CG4；三态退出码映射在 CI step）"
+  commit: >-
+    层 3 单 commit（sha 由 C5 收尾层回填；本层 commit 无法包含自身 sha，amend 被硬规则禁止）。
+    commit_budget：C1 affc9c7 + C2 1479a35 + C3 27fe7f6 + 本层 = 5/6，C5 预留 1。
+  note: >-
+    T8 的 6 条未移植声明**只追加注记**（未改命令、未删声明、未动 DSH 面副本）；T9 的 30 个 `.ps1` 零改动。
+    T7 的两个 installer 改动面**仅限**失败关闭与占位符层（未动资产策略/拷贝语义/卸载路径）。
+    `install.ps1` 的可执行验证归 CG5（本地无 pwsh）——本地只有静态判据，属**残留不确定性**，不记 pass。
   l2_manifest: null
 ## 阻塞与风险（实时）
 

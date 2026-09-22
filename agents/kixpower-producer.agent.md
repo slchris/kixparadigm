@@ -6,7 +6,8 @@ agents: []
 # 省略 tools 字段 = 所有工具可用（含 MCP GitHub 提 Issue/合并 PR、扩展工具）
 disable-model-invocation: false
 hooks:
-   PreToolUse: [{ type: command, command: 'pwsh -NoProfile -File "{{COPILOT_HOME}}/skills/kixpower/hooks/block-dev-authority-edit.ps1"', timeout: 10 }, { type: command, command: 'pwsh -NoProfile -File "{{COPILOT_HOME}}/skills/kixpower/hooks/block-source-edit.ps1"', timeout: 10 }, { type: command, command: 'pwsh -NoProfile -File "{{COPILOT_HOME}}/skills/kixpower/hooks/blast-radius-check.ps1"', timeout: 10 }, { type: command, command: 'pwsh -NoProfile -File "{{COPILOT_HOME}}/skills/kixpower/hooks/pre-commit-lint-check.ps1"', timeout: 30 }]
+   # 宿主能力条件：本行最后一个命令 pre-commit-lint-check 属 H-set-B（未移植）→ 无 pwsh 的宿主上**不触发**（见 skills/kixpower/hooks/README.md）
+   PreToolUse: [{ type: command, command: 'node "{{COPILOT_HOME}}/skills/kixpower/hooks/block-dev-authority-edit.cjs"', timeout: 10 }, { type: command, command: 'node "{{COPILOT_HOME}}/skills/kixpower/hooks/block-source-edit.cjs"', timeout: 10 }, { type: command, command: 'node "{{COPILOT_HOME}}/skills/kixpower/hooks/blast-radius-check.cjs"', timeout: 10 }, { type: command, command: 'pwsh -NoProfile -File "{{COPILOT_HOME}}/skills/kixpower/hooks/pre-commit-lint-check.ps1"', timeout: 30 }]
 ---
 # Kixpower Producer — Remy（制作人）
 

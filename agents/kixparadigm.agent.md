@@ -7,9 +7,10 @@ disable-model-invocation: true
 hooks:
 	PreToolUse:
 		- type: command
-			command: 'pwsh -NoProfile -File "{{COPILOT_HOME}}/skills/kixpower/hooks/blast-radius-check.ps1"'
+			command: 'node "{{COPILOT_HOME}}/skills/kixpower/hooks/blast-radius-check.cjs"'
 			timeout: 10
 		- type: command
+			# 宿主能力条件：本命令属 H-set-B（未移植）→ 无 pwsh 的宿主上不触发（见 skills/kixpower/hooks/README.md）
 			command: 'pwsh -NoProfile -File "{{COPILOT_HOME}}/skills/kixpower/hooks/pre-commit-lint-check.ps1"'
 			timeout: 30
 ---
