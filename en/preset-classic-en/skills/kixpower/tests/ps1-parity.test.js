@@ -16,6 +16,16 @@
 // gate 读取规则：exit 0 + `parity: PASS` = 通过；exit≠0 + `parity: FAIL` = unmet；
 // exit≠0 + `parity: unavailable` = 能力缺失（LG10 记 unavailable，走 §7.3 降级路径）。
 //
+// ⚠ v2 修订（plan.md §13.1 T6 步骤 D，2026-09-22）：三态的**进程退出码**目标为
+//   0=PASS / 1=FAIL / 2=unavailable。实测（Node 22.14）：`node --test <file>` 把测试子进程的任何
+//   失败**归一化为 exit 1**（本文件内 `process.exit(2)` / `process.exitCode = 2` 均被外层 runner 抹平）
+//   → **本 gate 的 cmd（`node --test …`）无法表达 2**。因此：
+//   - 本文件保留状态行作为唯一的三态机器可读通道（`parity: PASS|FAIL|unavailable`，T1 设计不变）；
+//   - 三态退出码在 **CI step**（`.github/workflows/ci.yml` 的 "Parity vs pwsh reference (E1, three-state)"）
+//     按状态行映射为 0/1/2，供 CG4 机械定档；
+//   - 本地 `unavailable` 的进程退出码仍为 1（非 0 ⇒ 不计入通过；禁止写成 skip/pass/「已等价」）。
+//   该机制限制已登记在 `docs/sprint-2/progress.md`（`parity_exit_code:` 行）。
+//
 // 运行：`node --test skills/kixpower/tests/ps1-parity.test.js`（LG10）。
 // **不挂进 npm test 链**（plan.md §2 / §7-MG1）：否则无 oracle 的宿主会把 canonical 链变红。
 
@@ -65,8 +75,10 @@ function psQuote(value) {
   return "'" + String(value).replace(/'/g, "''") + "'"
 }
 
-function runOracle(script, { cwd = REPO_ROOT } = {}) {
-  return spawnSync(ORACLE, ['-NoProfile', '-NonInteractive', '-Command', script], { cwd, encoding: 'buffer' })
+// script：经 -Command 执行的脚本片段；args：经 -File 执行的参数数组（二者互斥）
+function runOracle(script, { cwd = REPO_ROOT, args = null } = {}) {
+  const argv = args ? ['-NoProfile', '-NonInteractive', ...args] : ['-NoProfile', '-NonInteractive', '-Command', script]
+  return spawnSync(ORACLE, argv, { cwd, encoding: 'buffer' })
 }
 
 function runNode(args, { cwd = REPO_ROOT } = {}) {
@@ -141,8 +153,127 @@ function compareContract() {
   }
 }
 
+// ── T2：validate-memory-backlog 的差分对拍 ─────────────────────────────────
+// fixture 分两组：合法（三行统计 + exit 0）与非法（errors 段逐字 + exit 2）。
+// 非法组刻意把 4 类规则各放一条：重复 id / 缺 status / validated 缺 trial+pass / archived 缺 archive_reason
+// —— 使「逐字对齐」覆盖规则集合与错误顺序，而不只是 happy path。
+const VALIDATOR_BACKLOG_VALID = [
+  '- id: HB-1',
+  '  type: rule',
+  '  problem: p1',
+  '  improvement: i1',
+  '  source: s1',
+  '  evidence: e1',
+  '  eval:',
+  '    kind: origin',
+  '    result: observed',
+  '  status: candidate',
+  '',
+  '- id: HB-2',
+  '  type: rule',
+  '  problem: p2',
+  '  improvement: i2',
+  '  source: s2',
+  '  evidence: e2',
+  '  eval: e2',
+  '  status: archived',
+  '  archive_reason: stale',
+  '',
+].join('\n')
+
+const VALIDATOR_BACKLOG_INVALID = [
+  '- id: HB-1',
+  '  type: rule',
+  '  problem: p1',
+  '  improvement: i1',
+  '  source: s1',
+  '  evidence: e1',
+  '  eval: e1',
+  '  status: candidate',
+  '',
+  '- id: HB-1',
+  '  type: rule',
+  '  problem: p1b',
+  '  improvement: i1b',
+  '  source: s1',
+  '  evidence: e1',
+  '  eval: e1',
+  '  status: candidate',
+  '',
+  '- id: HB-2',
+  '  type: rule',
+  '  problem: p2',
+  '  improvement: i2',
+  '  source: s2',
+  '  evidence: e2',
+  '  eval: e2',
+  '  status: validated',
+  '',
+  '- id: HB-3',
+  '  type: rule',
+  '  problem: p3',
+  '  improvement: i3',
+  '  source: s3',
+  '  evidence: e3',
+  '  eval: e3',
+  '  status: archived',
+  '',
+].join('\n')
+
+function makeParityBacklog(content) {
+  const root = tempDir('kix-parity-backlog-')
+  const dir = path.join(root, '.kixpower', 'memory', 'repo')
+  fs.mkdirSync(dir, { recursive: true })
+  fs.writeFileSync(path.join(dir, 'harness-backlog.md'), content, 'utf8')
+  return root
+}
+
+function compareValidator(kind) {
+  const root = makeParityBacklog(kind === 'valid' ? VALIDATOR_BACKLOG_VALID : VALIDATOR_BACKLOG_INVALID)
+  try {
+    const oracle = runOracle(null, {
+      args: ['-NoProfile', '-NonInteractive', '-File', path.join(REPO_ROOT, 'skills', 'kixpower', 'scripts', 'validate-memory-backlog.ps1'), '-ProjectRoot', root],
+    })
+    const node = runNode([path.join(REPO_ROOT, 'skills', 'kixpower', 'scripts', 'validate-memory-backlog.cjs'), '--project-root', root])
+    return { label: `validate-memory-backlog#${kind}`, oracle, node }
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true })
+  }
+}
+
+// ── T3：verification-fidelity-check 的差分对拍 ────────────────────────────
+// 直接对**当前仓库**跑（两边读同一 revision 的工作树 → 输出必须逐字节一致），
+// 覆盖 baseline 分支与真实 scope/fidelity 计算两条路径。
+function compareFidelity(prevSprint) {
+  const ps1 = path.join(REPO_ROOT, 'skills', 'kixpower', 'scripts', 'verification-fidelity-check.ps1')
+  const cjs = path.join(REPO_ROOT, 'skills', 'kixpower', 'scripts', 'verification-fidelity-check.cjs')
+  const oracle = runOracle(null, { args: ['-NoProfile', '-NonInteractive', '-File', ps1, '-ProjectRoot', REPO_ROOT, '-PrevSprint', String(prevSprint)] })
+  const node = runNode([cjs, '--project-root', REPO_ROOT, '--prev-sprint', String(prevSprint)])
+  return { label: `verification-fidelity-check#prev${prevSprint}`, oracle, node }
+}
+
 const PARITY_CASES = [
   { name: 'kixpower-contract.cjs', desc: '契约 helper（Get-KixRequiredLocalGates + 规范化 manifest + SHA-256）', run: compareContract },
+  {
+    name: 'validate-memory-backlog.cjs#valid',
+    desc: 'memory lifecycle validator（合法 fixture：三行统计 + exit 0）',
+    run: () => compareValidator('valid'),
+  },
+  {
+    name: 'validate-memory-backlog.cjs#invalid',
+    desc: 'memory lifecycle validator（非法 fixture：errors 段逐字 + exit 2）',
+    run: () => compareValidator('invalid'),
+  },
+  {
+    name: 'verification-fidelity-check.cjs#baseline',
+    desc: 'fidelity check（--prev-sprint 0 的 baseline 分支）',
+    run: () => compareFidelity(0),
+  },
+  {
+    name: 'verification-fidelity-check.cjs#sprint1',
+    desc: 'fidelity check（对真实仓库跑 Sprint 1 → 2 的 scope/fidelity 计算）',
+    run: () => compareFidelity(1),
+  },
 ]
 
 function summarize(result) {
@@ -189,6 +320,20 @@ for (const parityCase of PARITY_CASES) {
 test('parity harness 自检：fixture 与 oracle 契约形状（不依赖 oracle 能力）', () => {
   assert.ok(REPO_ROOT, 'repo root not found from test file location')
   assert.ok(fs.existsSync(path.join(REPO_ROOT, 'skills', 'kixpower', 'scripts', 'kixpower-contract.ps1')), '参照实现缺失（E1 的 oracle 输入）')
+  assert.ok(fs.existsSync(path.join(REPO_ROOT, 'skills', 'kixpower', 'scripts', 'validate-memory-backlog.ps1')), 'validator 参照实现缺失（E1 的 oracle 输入）')
+  assert.ok(fs.existsSync(path.join(REPO_ROOT, 'skills', 'kixpower', 'scripts', 'verification-fidelity-check.ps1')), 'fidelity 参照实现缺失（E1 的 oracle 输入）')
+  // 覆盖登记自检：**已落地**的 Node 移植件必须登记 parity 用例（plan.md §4-T4 的关键归属要求：
+  // 4 个移植件的差分断言一律留在这个文件里，不得回到各自的功能测试文件）
+  const portedArtifacts = ['kixpower-contract.cjs', 'validate-memory-backlog.cjs', 'verification-fidelity-check.cjs', 'sync-dsh-preset.cjs']
+  for (const file of portedArtifacts) {
+    const candidates = [
+      path.join(REPO_ROOT, 'skills', 'kixpower', 'scripts', file),
+      path.join(REPO_ROOT, 'scripts', file),
+    ]
+    if (!candidates.some((candidate) => fs.existsSync(candidate))) continue
+    const stem = file.replace(/\.cjs$/, '')
+    assert.ok(PARITY_CASES.some((c) => c.name.startsWith(stem)), `${file} 已落地但未登记 parity 用例`)
+  }
   const planText = CONTRACT_FIXTURE_PLAN
   const gates = contract.requiredLocalGates(planText)
   assert.equal(gates.length, 2, 'fixture 必须 ≥2 条 required local_gate（避开单元素解包差异）')
@@ -198,4 +343,18 @@ test('parity harness 自检：fixture 与 oracle 契约形状（不依赖 oracle
   assert.equal(manifest, '[{"id":"LG1","type":"local_gate","cmd":"npm run test:installer","expect":"exit 0","required":true},'
     + '{"id":"LG2","type":"local_gate","cmd":"npm run test:consistency","expect":"exit 0","required":true}]')
   assert.match(contract.sha256Hex(manifest), /^[0-9a-f]{64}$/)
+  // 非法 fixture 必须真的非法：4 类规则各命中一次（否则 E1 的 invalid 用例是空转）
+  const invalidRoot = makeParityBacklog(VALIDATOR_BACKLOG_INVALID)
+  try {
+    const nodeResult = runNode([path.join(REPO_ROOT, 'skills', 'kixpower', 'scripts', 'validate-memory-backlog.cjs'), '--project-root', invalidRoot])
+    assert.equal(nodeResult.status, 2)
+    const out = String(nodeResult.stdout)
+    for (const expected of [
+      'duplicate id: HB-1',
+      'HB-2: validated record needs a trial/pass evidence',
+      'HB-3: archived record needs archive_reason',
+    ]) assert.ok(out.includes(expected), `invalid fixture 未命中 ${expected}: ${out}`)
+  } finally {
+    fs.rmSync(invalidRoot, { recursive: true, force: true })
+  }
 })

@@ -13,7 +13,9 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
+const os = require('node:os')
 const path = require('node:path')
+const { spawnSync } = require('node:child_process')
 
 const contract = require('../scripts/kixpower-contract.cjs')
 
@@ -219,14 +221,215 @@ test('E3 冻结凭据复算：对 docs/sprint-1/plan.md 的 required local_gate 
   assert.equal(digestCodepoint, 'b533cf263e04895bc54b776e0542d433a2a222e372ceeb55970810654af08b0d')
 })
 
-test('E3：Sprint 2 plan 自身可复算（12 required gate，LG10 带 host_requires）', () => {
+test('E3：Sprint 2 plan 自身可复算（v2 口径 13 required gate；LG10 移出 required 但 host_requires 保留）', () => {
   assert.ok(REPO_ROOT, 'repo root not found from test file location')
   const plan = fs.readFileSync(path.join(REPO_ROOT, 'docs', 'sprint-2', 'plan.md'), 'utf8')
   const gates = contract.requiredLocalGates(plan)
   const ids = gates.map((g) => g.id)
-  assert.equal(ids.length, 12)
-  assert.deepEqual(ids.slice().sort(), ['LG1', 'LG10', 'LG11', 'LG12', 'LG2', 'LG3', 'LG4', 'LG5', 'LG6', 'LG7', 'LG8', 'LG9'])
-  assert.deepEqual(gates.filter((g) => g.host_requires.length).map((g) => [g.id, g.host_requires]), [['LG10', ['pwsh']]])
+  // plan.md §16.5（增量重规划，2026-09-22）：required local_gate v2 = 13 条
+  // （T1 时的 12 条 = §7 口径，含 LG10；v2 移除 LG10、新增 LG15/LG16 → 13）。本断言随生效口径更新。
+  assert.equal(ids.length, 13)
+  assert.deepEqual(ids.slice().sort(), ['LG1', 'LG11', 'LG12', 'LG15', 'LG16', 'LG2', 'LG3', 'LG4', 'LG5', 'LG6', 'LG7', 'LG8', 'LG9'])
+  // LG10 仍是三态语义的载体：required: false + host_requires: [pwsh]，故不出现在 required 集合里；
+  // 用全量 gate 记录断言它未被删除、且 host_requires 维度仍被解析（否则 §16.1 的修订会被静默吞掉）。
+  const lg10 = contract.planGateRecords(plan).filter((g) => g.id === 'LG10')
+  assert.equal(lg10.length, 1, 'LG10 必须仍存在于 plan 的 verifiable_gates 中（潜伏通道，§16.1）')
+  assert.equal(lg10[0].required, false)
+  assert.deepEqual(lg10[0].host_requires, ['pwsh'])
   assert.equal(contract.gateManifestConflicts(plan).length, 0)
   assert.match(contract.sha256Hex(contract.gateManifestJson(gates)), /^[0-9a-f]{64}$/)
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// T2：validate-memory-backlog.cjs（L4 canonical lifecycle validator）
+//
+// 证据形状：**CLI 端到端 spawn**（fixture 根 → exit code + stdout 行），不依赖 oracle 能力。
+// 4 组负向控制（缺 status / 重复 id / validated 缺 trial+pass / archived 缺 archive_reason）
+// 是「断言非恒真」的机械证明：每组必须同时命中 exit 2 **与**对应错误文案。
+// ═══════════════════════════════════════════════════════════════════════════
+
+const VALIDATOR = path.join(__dirname, '..', 'scripts', 'validate-memory-backlog.cjs')
+
+function makeBacklogRoot(content) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kix-backlog-'))
+  const dir = path.join(root, '.kixpower', 'memory', 'repo')
+  fs.mkdirSync(dir, { recursive: true })
+  if (content !== null) fs.writeFileSync(path.join(dir, 'harness-backlog.md'), content, 'utf8')
+  return root
+}
+
+function runValidator(root) {
+  const result = spawnSync(process.execPath, [VALIDATOR, '--project-root', root], { encoding: 'utf8' })
+  return { status: result.status, stdout: result.stdout, lines: result.stdout.split(os.EOL).filter(Boolean) }
+}
+
+// 合法 candidate 记录（kind: origin 满足 candidate 的 origin 证据要求；6 个必备字段齐全）
+function candidateRecord(id, improvement) {
+  return [
+    `- id: ${id}`,
+    '  type: rule',
+    `  problem: p-${id}`,
+    `  improvement: ${improvement}`,
+    '  source: "some/source.cjs:1"',
+    '  evidence:',
+    '    - task: "Sprint 2"',
+    '      kind: origin',
+    '      result: observed',
+    '  eval:',
+    '    kind: origin',
+    '    result: observed',
+    '  status: candidate',
+    '',
+  ].join('\n')
+}
+
+test('T2 正向控制：合法 backlog → exit 0 + 三行统计', () => {
+  const root = makeBacklogRoot(candidateRecord('HB-1', 'do a thing') + candidateRecord('HB-2', 'do another thing'))
+  const result = runValidator(root)
+  assert.equal(result.status, 0, result.stdout)
+  assert.deepEqual(result.lines, ['memory_backlog: valid', 'record_count: 2', 'legacy_unstructured_records: 0'])
+})
+
+test('T2 负向控制①：缺 status → exit 2 + missing or invalid status', () => {
+  const root = makeBacklogRoot(['- id: HB-1', '  type: rule', '  problem: p', '  improvement: i', '  source: s', '  evidence: e', '  eval: e', ''].join('\n'))
+  const result = runValidator(root)
+  assert.equal(result.status, 2)
+  assert.ok(result.lines.includes('errors:'), result.stdout)
+  assert.ok(result.lines.includes('  - HB-1: missing or invalid status'), result.stdout)
+})
+
+test('T2 负向控制②：重复 id → exit 2 + duplicate id，且该记录不再产生后续错误（规则顺序）', () => {
+  const root = makeBacklogRoot(candidateRecord('HB-1', 'first') + candidateRecord('HB-1', 'second'))
+  const result = runValidator(root)
+  assert.equal(result.status, 2)
+  const errors = result.lines.filter((l) => l.startsWith('  - '))
+  assert.deepEqual(errors, ['  - duplicate id: HB-1'])
+})
+
+test('T2 负向控制③：validated 缺 trial+pass → exit 2', () => {
+  const root = makeBacklogRoot([
+    '- id: HB-1',
+    '  type: rule',
+    '  problem: p',
+    '  improvement: i',
+    '  source: s',
+    '  evidence: e',
+    '  eval:',
+    '    kind: origin',
+    '    result: observed',
+    '  status: validated',
+    '',
+  ].join('\n'))
+  const result = runValidator(root)
+  assert.equal(result.status, 2)
+  assert.ok(result.lines.includes('  - HB-1: validated record needs a trial/pass evidence'), result.stdout)
+})
+
+test('T2 负向控制④：archived 缺 archive_reason → exit 2', () => {
+  const root = makeBacklogRoot([
+    '- id: HB-1',
+    '  type: rule',
+    '  problem: p',
+    '  improvement: i',
+    '  source: s',
+    '  evidence: e',
+    '  eval: e',
+    '  status: archived',
+    '',
+  ].join('\n'))
+  const result = runValidator(root)
+  assert.equal(result.status, 2)
+  assert.ok(result.lines.includes('  - HB-1: archived record needs archive_reason'), result.stdout)
+})
+
+test('T2：candidate 缺 origin 证据 / improvement 语义重复 / legacy 计数 / missing backlog', () => {
+  const noOrigin = makeBacklogRoot(candidateRecord('HB-1', 'i').replaceAll('kind: origin', 'kind: trial'))
+  const noOriginResult = runValidator(noOrigin)
+  assert.equal(noOriginResult.status, 2)
+  assert.ok(noOriginResult.lines.includes('  - HB-1: candidate record needs origin evidence'))
+
+  const dupImprovement = makeBacklogRoot(candidateRecord('HB-1', 'same text') + candidateRecord('HB-2', '  same   text  '))
+  const dupResult = runValidator(dupImprovement)
+  assert.equal(dupResult.status, 2)
+  assert.ok(dupResult.lines.includes('  - HB-2: duplicate improvement semantics with HB-1'), dupResult.stdout)
+
+  const legacy = makeBacklogRoot(candidateRecord('HB-1', 'i') + '- [legacy] unstructured line\n- [legacy 2] another\n')
+  const legacyResult = runValidator(legacy)
+  assert.equal(legacyResult.status, 0)
+  assert.deepEqual(legacyResult.lines, ['memory_backlog: valid', 'record_count: 1', 'legacy_unstructured_records: 2'])
+
+  const missing = runValidator(makeBacklogRoot(null))
+  assert.equal(missing.status, 2)
+  assert.deepEqual(missing.lines, ['memory_backlog: missing'])
+
+  const unresolved = runValidator(path.join(os.tmpdir(), 'kix-backlog-does-not-exist-12345'))
+  assert.equal(unresolved.status, 1)
+  assert.deepEqual(unresolved.lines, [])
+})
+
+test('T2 验收：对真实 repo 运行 → exit 0 且 record_count 等于文件中 `- id:` 记录数（派生，非写死）', () => {
+  assert.ok(REPO_ROOT, 'repo root not found from test file location')
+  const backlogPath = path.join(REPO_ROOT, '.kixpower', 'memory', 'repo', 'harness-backlog.md')
+  const text = fs.readFileSync(backlogPath, 'utf8')
+  const derived = [...text.matchAll(/^\s*-\s+id:\s*\S+/gm)].length
+  const result = runValidator(REPO_ROOT)
+  assert.equal(result.status, 0, result.stdout)
+  assert.ok(result.lines.includes('memory_backlog: valid'), result.stdout)
+  assert.ok(result.lines.includes(`record_count: ${derived}`), `${result.stdout} (derived=${derived})`)
+})
+
+// ═══════════════════════════════════════════════════════════════════════════
+// T3：verification-fidelity-check.cjs
+// glob 语义是最容易写错的一环（花括号展开 / 占位符顺序 / `-match` 大小写不敏感），
+// 先钉固定用例；CLI 的 baseline 分支是唯一完全确定性的端到端路径（不依赖 git 状态）。
+// ═══════════════════════════════════════════════════════════════════════════
+
+const fidelity = require('../scripts/verification-fidelity-check.cjs')
+const FIDELITY_CLI = path.join(__dirname, '..', 'scripts', 'verification-fidelity-check.cjs')
+
+test('T3 glob：花括号 / 双星 / 单星 / 问号 / 大小写不敏感', () => {
+  assert.equal(fidelity.globMatch('docs/readme.md', ['**/*.md']), true)
+  assert.equal(fidelity.globMatch('readme.md', ['**/*.md']), true)
+  assert.equal(fidelity.globMatch('src/a/b.rs', ['src/**']), true)
+  assert.equal(fidelity.globMatch('src/b.rs', ['src/**']), true)
+  assert.equal(fidelity.globMatch('other/b.rs', ['src/**']), false)
+  assert.equal(fidelity.globMatch('a/x.js', ['{a,b}/**']), true)
+  assert.equal(fidelity.globMatch('b/x.js', ['{a,b}/**']), true)
+  assert.equal(fidelity.globMatch('c/x.js', ['{a,b}/**']), false)
+  assert.equal(fidelity.globMatch('src/a.js', ['src/*.js']), true)
+  assert.equal(fidelity.globMatch('src/nested/a.js', ['src/*.js']), false)
+  assert.equal(fidelity.globMatch('ab.cjs', ['a?.cjs']), true)
+  assert.equal(fidelity.globMatch('a/b.cjs', ['a?.cjs']), false)
+  // PowerShell `-match` 默认大小写不敏感 → 与参照实现同口径
+  assert.equal(fidelity.globMatch('docs/x.md', ['Docs/**']), true)
+  assert.equal(fidelity.globMatch('scripts/sync-dsh-preset.cjs', ['scripts/sync-dsh-preset.cjs']), true)
+  assert.equal(fidelity.globToRegex('docs/**'), '^docs/.*$')
+})
+
+test('T3 CLI：--prev-sprint 0 → baseline 三行（确定性，无 git 依赖）', () => {
+  const result = spawnSync(process.execPath, [FIDELITY_CLI, '--project-root', REPO_ROOT, '--prev-sprint', '0'], { encoding: 'utf8' })
+  assert.equal(result.status, 0)
+  assert.deepEqual(result.stdout.split(os.EOL).filter(Boolean), [
+    '=== Verification Fidelity Check v5.7 ===',
+    'verification_fidelity: baseline',
+    'baseline_source: no_previous_sprint',
+  ])
+})
+
+test('T3 CLI：对真实 repo 跑 Sprint 1 → 2，输出累积 YAML 段且 baseline 取自 progress', () => {
+  assert.ok(REPO_ROOT, 'repo root not found from test file location')
+  const result = spawnSync(process.execPath, [FIDELITY_CLI, '--project-root', REPO_ROOT, '--prev-sprint', '1'], { encoding: 'utf8' })
+  assert.equal(result.status, 0, result.stdout)
+  const out = result.stdout
+  assert.match(out, /\[Scope Rules\]/)
+  assert.match(out, /\[Verification Fidelity\]/)
+  assert.match(out, /baseline_source: progress\.sprint_baseline_sha/)
+  assert.match(out, /ungated_ratio_pct: [\d.]+/)
+  assert.match(out, /liveness_marked_tasks: \d+/)
+  // 计数自洽：in_scope + whitelisted + ungated == total（三分类互斥完备）
+  const total = Number(/total changed: (\d+)/.exec(out)[1])
+  const inScope = Number(/in_scope \(rules\): (\d+)/.exec(out)[1])
+  const whitelisted = Number(/whitelisted: (\d+)/.exec(out)[1])
+  const ungated = Number(/ungated: (\d+)/.exec(out)[1])
+  assert.equal(inScope + whitelisted + ungated, total)
 })

@@ -362,7 +362,7 @@ write(l2_verification_passed, l2_verified_sha, l2_gate_manifest_sha256, l2_stash
 
 每个 Sprint 结束后 Producer 跑：
 ```bash
-pwsh skills/kixpower/scripts/verification-fidelity-check.ps1 -ProjectRoot <ROOT> -PrevSprint <N>
+node skills/kixpower/scripts/verification-fidelity-check.cjs --project-root <ROOT> --prev-sprint <N>
 ```
 输出未门禁文件比例。>20% 未门禁 → HIGH_RISK → 下个 Sprint 强制补 target_rules。
 

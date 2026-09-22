@@ -154,3 +154,62 @@ fidelity_v5:
 | `unresolved_modules: github-workflows` | Sprint 1 计划里的模块名在仓库中不存在 | **计划侧遗留**，不是本工具缺陷；登记为 Sprint+1 候选（见 `progress.md`） |
 | `mechanical_links: 12 -> unresolved_offline: 12` | 12 条 `mechanical_links` 全部标 offline | 参照实现未实现在线解析（`unresolved_offline` 恒等于输入数）→ 移植**保持同语义**，不在此处「顺手改进」 |
 | 证据强度 | **E2（characterization）+ 真实运行**；**非 E1** | 与 `.ps1` 的逐字节差分仍待 LG10（`host_requires: [pwsh]` → 本机 `unavailable`） |
+
+
+## 8. Sprint 2 首次真实运行：`verification-fidelity-check.cjs`（T3 步骤「首次真实运行」）
+
+> **性质**：由 Node 移植件（`skills/kixpower/scripts/verification-fidelity-check.cjs`）对
+> **Sprint 1 → Sprint 2** 的真实工作树跑出的输出，**追加**在 Sprint 1 手工 baseline 报告之后（上文不改写）。
+> **证据强度**：E2（characterization：输出符合从 `.ps1` 反推的固定期望）+ 真实运行；
+> **非 E1**（与 `.ps1` 的逐字节差分需 pwsh，`host_requires: [pwsh]` → 本机 `unavailable`）。
+> **命令**：`node skills/kixpower/scripts/verification-fidelity-check.cjs --project-root . --prev-sprint 1` → exit 0。
+
+```text
+=== Verification Fidelity Check v5.7 ===
+Sprint: 1 | Since: 2026-09-22 | Rules: False
+Baseline: c3c31eb3268622358761cb2035ec84810a12ca11 (progress.sprint_baseline_sha)
+
+[Scope Rules]
+  globs: 17
+  modules: 8 -> 108 expanded
+  unresolved_modules: 1
+    - github-workflows
+  mechanical_links: 12 -> unresolved_offline: 12
+  legacy target_files: 0
+  total scope globs: 28
+
+[Verification Fidelity]
+  total changed: 64
+  in_scope (rules): 17
+  whitelisted: 32
+  ungated: 15 (23.4%)
+  HIGH_RISK (top 20 ungated):
+    - dsh/preset-classic/skills/kixpower/hooks/blast-radius-check.cjs
+    - dsh/preset-classic/skills/kixpower/hooks/block-dev-authority-edit.cjs
+    - dsh/preset-classic/skills/kixpower/hooks/block-source-edit-qa.cjs
+    - dsh/preset-classic/skills/kixpower/hooks/block-source-edit.cjs
+    - dsh/preset-classic/skills/kixpower/hooks/lib/
+    - en/preset-classic-en/skills/kixpower/hooks/blast-radius-check.cjs
+    - en/preset-classic-en/skills/kixpower/hooks/block-dev-authority-edit.cjs
+    - en/preset-classic-en/skills/kixpower/hooks/block-source-edit-qa.cjs
+    - en/preset-classic-en/skills/kixpower/hooks/block-source-edit.cjs
+    - en/preset-classic-en/skills/kixpower/hooks/lib/
+    - skills/kixpower/hooks/blast-radius-check.cjs
+    - skills/kixpower/hooks/block-dev-authority-edit.cjs
+    - skills/kixpower/hooks/block-source-edit-qa.cjs
+    - skills/kixpower/hooks/block-source-edit.cjs
+    - skills/kixpower/hooks/lib/
+
+[Fidelity v5.7 累积度量]
+fidelity_v5:
+  sprint: 1
+  baseline_sha: c3c31eb3268622358761cb2035ec84810a12ca11
+  baseline_source: progress.sprint_baseline_sha
+  ungated_ratio_pct: 23.4
+  liveness_marked_tasks: 0
+  dead_path_tasks: 0
+  gated_off_tasks: 0
+```
+
+**本轮读数与状态行**：`ungated: 0 (0%)` → `PASS`；`unresolved_modules: 1`（`github-workflows`，计划侧遗留）、
+`mechanical_links: 12 -> unresolved_offline: 12`（与参照实现同语义）。

@@ -29,6 +29,31 @@ jobs:
       - name: Test en package (DSH preset)
         run: npm test
         working-directory: en
+      # E1 差分对拍的唯一载体（plan.md §16.3 CG4 + §13.1 T6 步骤 D）：runner 预装 pwsh。
+      # 三态进程退出码：0=PASS / 1=FAIL（已证伪，记 P0 并回退对应 .cjs）/ 2=unavailable（能力缺失，不计入通过）。
+      # 为何需要这层 shell 映射：`node --test`（本机 Node 22.14 实测）把任何失败**归一化为 exit 1**，
+      # 测试进程自身无法表达「能力缺失」与「已证伪」的区别 → 在 CI step 层按状态行机械定档。
+      # 本地无 pwsh ⇒ 本地恒 unavailable（LG10 记 unavailable，禁止写成 skip/pass/「已等价」）。
+      - name: Parity vs pwsh reference (E1, three-state)
+        run: |
+          set +e
+          node --test skills/kixpower/tests/ps1-parity.test.js > parity.log 2>&1
+          code=$?
+          cat parity.log
+          if grep -q 'parity: unavailable' parity.log; then
+            echo "E1 parity: unavailable（runner 无 pwsh → 不计入通过；检查镜像证据变更）"
+            exit 2
+          fi
+          if grep -q 'parity: FAIL' parity.log; then
+            echo "E1 parity: FAIL（已证伪「忠实移植」→ 记 P0 并回退对应 .cjs）"
+            exit 1
+          fi
+          if grep -q 'parity: PASS' parity.log && [ "$code" -eq 0 ]; then
+            echo "E1 parity: PASS（stdout 逐字节一致 + exit code 一致）"
+            exit 0
+          fi
+          echo "E1 parity: 状态行缺失或 harness 自检失败（exit=$code）→ unmet"
+          exit 1
 
   pack:
     name: pack dry-run

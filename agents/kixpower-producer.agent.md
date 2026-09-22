@@ -27,9 +27,9 @@ hooks:
 5. **Cross-Sprint Drift 检测**（新 Sprint 启动时必做）
    - 读上一 Sprint 的 `runtime-context.md` / `lessons-learned.md` / `progress.md` 的「Sprint+1 候选」
    - 读 `<PROJECT_ROOT>/.kixpower/memory/repo/harness-backlog.md`（上一 Sprint L4 Hill Climbing 写入的改进项）；宿主 `/memories/repo/` 仅作 legacy adapter
-   - **跑 verification-fidelity-check.ps1**（量化上一 Sprint 的门禁覆盖率）：
+   - **跑 verification-fidelity-check**（量化上一 Sprint 的门禁覆盖率；Node 化后宿主能力条件只剩 `node`）：
      ```bash
-     pwsh -NoProfile -File "{{COPILOT_HOME}}/skills/kixpower/scripts/verification-fidelity-check.ps1" -ProjectRoot <ROOT> -PrevSprint <N-1>
+     node "{{COPILOT_HOME}}/skills/kixpower/scripts/verification-fidelity-check.cjs" --project-root <ROOT> --prev-sprint <N-1>
      ```
      把输出的 YAML 段追加到 `docs/sprint-N/drift-check.md`
     - **Sprint 1 特例**：`N == 1` 时没有前序 Sprint，不传 `-PrevSprint 0`；生成 baseline drift 报告并标记 `verification_fidelity: baseline`。从 Sprint 2 起才比较 `N-1`。
