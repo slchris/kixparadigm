@@ -6,6 +6,7 @@ const fs = require('node:fs')
 const os = require('node:os')
 const path = require('node:path')
 const { spawnSync } = require('node:child_process')
+const { isInside } = require('./sync-dsh-preset.cjs')
 
 const ROOT = path.resolve(__dirname, '..')
 const SCRIPT = path.join(ROOT, 'scripts', 'sync-dsh-preset.cjs')
@@ -162,4 +163,46 @@ test('sync fails closed for missing or out-of-source declared pointers', (t) => 
   assert.notEqual(outside.status, 0)
   assert.match(outside.stderr, /outside the selected source/)
   assert.equal(fs.existsSync(path.join(outsideTarget, 'file.txt')), false)
+})
+
+// ── Sprint 3 T4：大小写不敏感分支必须**两侧对称**归一化 ────────────────────────
+// 背景：CI run 35729103867 的 windows-latest ×2 红 —— `Directory pointer escapes bundle root:
+// dsh\preset\skills`。根因是移植版只把 root 前缀转小写（`rootPrefix.toLowerCase()`），candidate
+// 原样保留 ⇒ Windows runner 的大写盘符 `D:\...` 永远不匹配小写前缀，合法指针被误判为逃逸。
+// 参照实现是对称的（ps1:48/80 定义单点 $comparison，:92/:93/:115/:135 两侧同用）。
+//
+// 该分支在 POSIX 宿主上走不到（CASE_INSENSITIVE = SEP === '\\'），故 isInside 支持注入大小写模式
+// 与分隔符 —— **不新增平台型 skip**（plan LG1 要求 skipped 恒为 0，Windows 侧覆盖由 CI 承担）。
+const WINDOWS_PATHS = { caseInsensitive: true, sep: '\\' }
+const POSIX_PATHS = { caseInsensitive: false, sep: '/' }
+// 与 CI windows runner 同形（大写盘符 + 反斜杠）
+const WINDOWS_ROOT = 'D:\\a\\kixparadigm\\kixparadigm'
+const WINDOWS_POINTER = 'D:\\a\\kixparadigm\\kixparadigm\\dsh\\preset\\skills'
+
+test('isInside keeps a case-insensitive pointer inside a case-insensitive root (T3 regression)', () => {
+  // CI 实际形状：盘符大写、root 与 candidate 同大小写 —— 只转 root 的旧实现此处返回 false
+  assert.equal(isInside(WINDOWS_POINTER, WINDOWS_ROOT, WINDOWS_PATHS), true)
+  // 仅大小写不同：candidate 小写 / 盘符大小写相反，两个方向都必须为 inside
+  assert.equal(isInside(WINDOWS_POINTER.toLowerCase(), WINDOWS_ROOT, WINDOWS_PATHS), true)
+  assert.equal(isInside(WINDOWS_POINTER, 'd:\\A\\KIXPARADIGM\\KIXPARADIGM', WINDOWS_PATHS), true)
+  // 相等分支（candidate === root）在大小写不敏感模式下同样成立
+  assert.equal(isInside(WINDOWS_ROOT, WINDOWS_ROOT, WINDOWS_PATHS), true)
+})
+
+test('isInside stays Ordinal in case-sensitive mode (POSIX semantics unchanged)', () => {
+  assert.equal(isInside('/tmp/kix/BUNDLE/src', '/tmp/kix/bundle', POSIX_PATHS), false)
+  assert.equal(isInside('/tmp/kix/bundle/src', '/tmp/kix/bundle', POSIX_PATHS), true)
+  // 默认参数必须仍绑宿主常量：POSIX 宿主 ⇒ Ordinal，win32 宿主 ⇒ OrdinalIgnoreCase
+  const hostJoin = (...parts) => parts.join(path.sep)
+  assert.equal(
+    isInside(hostJoin('/tmp', 'BUNDLE', 'src'), hostJoin('/tmp', 'bundle')),
+    process.platform === 'win32',
+  )
+})
+
+test('isInside rejects genuinely escaping paths in case-insensitive mode (control group)', () => {
+  // 控制组：证明上一条断言不是「恒真」—— 同一模式下的真逃逸必须为 false
+  assert.equal(isInside('D:\\a\\kixparadigm\\kixparadigm-evil\\skills', WINDOWS_ROOT, WINDOWS_PATHS), false)
+  assert.equal(isInside('D:\\a\\other\\skills', WINDOWS_ROOT, WINDOWS_PATHS), false)
+  assert.equal(isInside('D:\\a\\kixparadigm', WINDOWS_ROOT, WINDOWS_PATHS), false)
 })

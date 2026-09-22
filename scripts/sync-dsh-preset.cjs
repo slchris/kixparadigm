@@ -33,10 +33,14 @@ const SEP = path.sep
 // Windows 路径大小写不敏感；POSIX 上 Ordinal
 const CASE_INSENSITIVE = SEP === '\\'
 
-function comparePaths(a, b) {
-  const left = CASE_INSENSITIVE ? String(a).toLowerCase() : String(a)
-  const right = CASE_INSENSITIVE ? String(b).toLowerCase() : String(b)
-  return left === right
+// 两侧**对称**归一化（对标参照实现 ps1:79-83 的单点 $comparison）。caseInsensitive 做成默认参数：
+// 值语义不变（仍取宿主 CASE_INSENSITIVE），但非 Windows 宿主可注入 true 后断言该分支（Sprint 3 T4）。
+function normalizePath(value, caseInsensitive = CASE_INSENSITIVE) {
+  return caseInsensitive ? String(value).toLowerCase() : String(value)
+}
+
+function comparePaths(a, b, caseInsensitive = CASE_INSENSITIVE) {
+  return normalizePath(a, caseInsensitive) === normalizePath(b, caseInsensitive)
 }
 
 function out(line) {
@@ -126,9 +130,13 @@ function fileHashSafe(target) {
   }
 }
 
-function isInside(candidate, root) {
-  const rootPrefix = String(root).replace(/[\\/]+$/, '') + SEP
-  return comparePaths(candidate, root) || String(candidate).startsWith(CASE_INSENSITIVE ? rootPrefix.toLowerCase() : rootPrefix)
+// candidate 是否落在 root 之内（含 root 自身）。`sep`/`caseInsensitive` 可注入的原因：Windows 的
+// 大小写不敏感分支在 POSIX 宿主上无法用宿主 SEP 构造（盘符路径 `D:\...`），而该分支正是 Sprint 2
+// 移植的回归点。默认值一律取宿主常量 ⇒ 既有 2 参调用点（:157/:158/:162/:178）行为不变。
+function isInside(candidate, root, { caseInsensitive = CASE_INSENSITIVE, sep = SEP } = {}) {
+  const rootPrefix = String(root).replace(/[\\/]+$/, '') + sep
+  return comparePaths(candidate, root, caseInsensitive)
+    || normalizePath(candidate, caseInsensitive).startsWith(normalizePath(rootPrefix, caseInsensitive))
 }
 
 function readPointerTarget(pointerPath, declaredPath) {
@@ -303,6 +311,7 @@ module.exports = {
   parseArgs,
   listFilesRecursive,
   fileHashSafe,
+  isInside,
   sourceEntries,
   defaultDirectoryPointers,
   main,
